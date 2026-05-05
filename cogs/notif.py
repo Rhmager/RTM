@@ -51,6 +51,8 @@ def rotate_api_key():
 configure_genai()
 
 def _get_youtube_video_id(url):
+    if not url: return None
+    url = url.replace('\\', '')
     youtube_regex = r'(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|watch\?.*&v=|live\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
     match = re.search(youtube_regex, url)
     return match.group(1) if match else None
@@ -433,7 +435,7 @@ class TypeSelectView(discord.ui.View):
         
         options = []
         for key in self.cog.default_messages.keys():
-            options.append(discord.SelectOption(label=key.capitalize(), value=key))
+            options.append(discord.SelectOption(label=key.capitalize().replace('_', ' '), value=key))
             
         type_select = discord.ui.Select(
             placeholder="Pilih Tipe Pesan...",
@@ -470,27 +472,34 @@ class Notif(commands.Cog, name="🔔 Notification"):
         self.daily_reset_task.cancel()
 
     async def _extract_url_from_message(self, message):
-        markdown_url_pattern = r'\[.*?\]\((https?://[^\)]+)\)'
-        markdown_match = re.search(markdown_url_pattern, message.content)
+        content_clean = message.content.replace('\\', '')
         
+        markdown_url_pattern = r'\[.*?\]\((https?://[^\)]+)\)'
+        markdown_match = re.search(markdown_url_pattern, content_clean)
         if markdown_match:
             return markdown_match.group(1)
         
         general_url_pattern = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
-        match = general_url_pattern.search(message.content)
-        
+        match = general_url_pattern.search(content_clean)
         if match:
             return match.group(0).rstrip(').,!')
+            
+        youtu_pattern = re.compile(r'youtu\.be/[a-zA-Z0-9_-]{11}')
+        match2 = youtu_pattern.search(content_clean)
+        if match2:
+            return "https://" + match2.group(0)
         
         return None
 
     async def _detect_youtube_link(self, url, message_content):
+        url = url.replace('\\', '')
+        content_clean = message_content.replace('\\', '').lower()
         youtube_regex = r'(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|watch\?.*&v=|live\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
         
         if re.search(youtube_regex, url):
-            if "live" in message_content.lower() or "/live/" in url or "youtube.com/live/" in url:
+            if "live" in content_clean or "/live/" in url or "youtube.com/live/" in url:
                 return "live", url
-            elif "premier" in message_content.lower() or "premiere" in message_content.lower():
+            elif "premier" in content_clean or "premiere" in content_clean:
                 return "premier", url
             else:
                 return "upload", url
@@ -498,6 +507,12 @@ class Notif(commands.Cog, name="🔔 Notification"):
         return None, url
 
     async def _detect_tiktok_link(self, url):
+        url = url.replace('\\', '')
+        
+        live_match = re.search(r'tiktok\.com/@([\w.-]+)/live', url, re.IGNORECASE)
+        if live_match:
+            return "tiktok_live", url
+
         tiktok_patterns = [
             r'(?:https?:\/\/)?(?:[\w-]+\.)?tiktok\.com/(?:@[\w.-]+\/)?video/(\d+)',
             r'(?:https?:\/\/)?(?:[\w-]+\.)?tiktok\.com/(?:@[\w.-]+\/)?t/(\w+)',
@@ -505,8 +520,6 @@ class Notif(commands.Cog, name="🔔 Notification"):
             r'(?:https?:\/\/)?(?:vm|vt|m)\.tiktok\.com/(\w+)'
         ]
 
-        original_url = url
-        
         for pattern in tiktok_patterns:
             if re.search(pattern, url, re.IGNORECASE):
                 if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
@@ -517,15 +530,34 @@ class Notif(commands.Cog, name="🔔 Notification"):
                                 final_url = str(response.url)
                                 if "tiktok.com" in final_url:
                                     url = final_url
-                    except Exception as e:
-                        print(f"Error resolving TikTok URL: {e}")
+                    except Exception:
+                        pass
                 
                 if "www.tiktok.com" not in url and "tiktok.com" in url:
                     url = url.replace("tiktok.com", "www.tiktok.com")
                 
                 return "tiktok", url
         
-        return None, original_url
+        return None, url
+
+    async def _detect_instagram_link(self, url):
+        url = url.replace('\\', '')
+        
+        live_match = re.search(r'instagram\.com/([A-Za-z0-9_.]+)/live', url, re.IGNORECASE)
+        if live_match:
+            return "instagram_live", url
+        
+        ig_patterns = [
+            r'instagram\.com/p/([A-Za-z0-9_-]+)',
+            r'instagram\.com/reel/([A-Za-z0-9_-]+)',
+            r'instagram\.com/tv/([A-Za-z0-9_-]+)'
+        ]
+        
+        for pattern in ig_patterns:
+            if re.search(pattern, url, re.IGNORECASE):
+                return "instagram", url
+                
+        return None, url
 
     async def _get_link_from_url(self, message):
         url = await self._extract_url_from_message(message)
@@ -539,14 +571,25 @@ class Notif(commands.Cog, name="🔔 Notification"):
         link_type, final_url = await self._detect_tiktok_link(url)
         if link_type:
             return link_type, final_url
+            
+        link_type, final_url = await self._detect_instagram_link(url)
+        if link_type:
+            return link_type, final_url
         
         return None, None
     
     def _get_unique_video_id(self, url):
+        if not url: return None
+        url = url.replace('\\', '')
+        
         youtube_regex = r'(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)?(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|watch\?.*&v=|live\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
         match = re.search(youtube_regex, url)
         if match:
             return f"yt_{match.group(1)}"
+
+        tk_live_match = re.search(r'tiktok\.com/@([\w.-]+)/live', url, re.IGNORECASE)
+        if tk_live_match:
+            return f"tk_live_{tk_live_match.group(1)}"
 
         tiktok_patterns = [
             r'(?:https?:\/\/)?(?:[\w-]+\.)?tiktok\.com/(?:@[\w.-]+\/)?video/(\d+)',
@@ -558,8 +601,15 @@ class Notif(commands.Cog, name="🔔 Notification"):
         for pattern in tiktok_patterns:
             match = re.search(pattern, url, re.IGNORECASE)
             if match:
-                video_id = match.group(1)
-                return f"tk_{video_id}"
+                return f"tk_{match.group(1)}"
+
+        ig_live_match = re.search(r'instagram\.com/([A-Za-z0-9_.]+)/live', url, re.IGNORECASE)
+        if ig_live_match:
+            return f"ig_live_{ig_live_match.group(1)}"
+
+        ig_match = re.search(r'instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)', url, re.IGNORECASE)
+        if ig_match:
+            return f"ig_{ig_match.group(1)}"
 
         return None
 
@@ -608,6 +658,39 @@ class Notif(commands.Cog, name="🔔 Notification"):
                 "embed_color": "#000000",
                 "use_embed": False,
                 "embed_thumbnail": True
+            },
+            "tiktok_live": {
+                "title": "[🔴 TikTok Live]({url})",
+                "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
+                "content": "@everyone {ai_hype}",
+                "button_label": "Tonton Live TikTok",
+                "button_style": discord.ButtonStyle.danger.value,
+                "button_color": "#ed4245",
+                "embed_color": "#e74c3c",
+                "use_embed": False,
+                "embed_thumbnail": True
+            },
+            "instagram": {
+                "title": "[📸 Instagram Post]({url})",
+                "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
+                "content": "@everyone {ai_hype}",
+                "button_label": "Buka Instagram",
+                "button_style": discord.ButtonStyle.primary.value,
+                "button_color": "#E1306C",
+                "embed_color": "#E1306C",
+                "use_embed": False,
+                "embed_thumbnail": True
+            },
+            "instagram_live": {
+                "title": "[🔴 Instagram Live]({url})",
+                "description": "Yuk join Instagram Live sekarang!\n\n{url}",
+                "content": "@everyone {ai_hype}",
+                "button_label": "Tonton IG Live",
+                "button_style": discord.ButtonStyle.danger.value,
+                "button_color": "#ed4245",
+                "embed_color": "#e74c3c",
+                "use_embed": False,
+                "embed_thumbnail": True
             }
         }
 
@@ -615,21 +698,21 @@ class Notif(commands.Cog, name="🔔 Notification"):
         default_config = {
             "notification_paths": {}, 
             "recent_video_ids": [],
-            "last_daily_reset_timestamp": None,
-            "next_daily_reset_timestamp": None,
-            "last_link_after_reset": None
+            "next_daily_reset_timestamp": None
         }
         config = {}
         try:
             with open(self.config_file, "r") as f:
                 config = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            print("File konfigurasi 'notif.json' tidak ditemukan atau rusak, membuat file baru.")
+            pass
         
         final_config = {**default_config, **config}
         
-        if "mirrored_users" in final_config:
-            del final_config["mirrored_users"]
+        keys_to_remove = ["mirrored_users", "last_daily_reset_timestamp", "last_link_after_reset"]
+        for key in keys_to_remove:
+            if key in final_config:
+                del final_config[key]
         
         for path_id, path_data in final_config["notification_paths"].items():
             if "custom_messages" in path_data:
@@ -643,25 +726,18 @@ class Notif(commands.Cog, name="🔔 Notification"):
         return final_config
 
     def save_config(self):
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, "w") as f:
             json.dump(self.config, f, indent=4)
             
     async def _perform_daily_reset(self):
         now = datetime.datetime.now(datetime.UTC) 
-        
-        last_unique_id = None
-        if self.config["recent_video_ids"]:
-            last_unique_id = self.config["recent_video_ids"][-1]
-            
         self.config["recent_video_ids"] = []
-        self.config["last_link_after_reset"] = last_unique_id
-        self.config["last_daily_reset_timestamp"] = now.isoformat()
         
         next_reset_time = now + datetime.timedelta(hours=24)
         self.config["next_daily_reset_timestamp"] = next_reset_time.isoformat()
         
         self.save_config()
-        print(f"Reset cache harian otomatis selesai. Waktu reset berikutnya: {next_reset_time.isoformat()}")
 
     @tasks.loop(hours=1)
     async def daily_reset_task(self):
@@ -681,20 +757,14 @@ class Notif(commands.Cog, name="🔔 Notification"):
                 delay = (next_reset_time - now).total_seconds()
                 
                 if delay > 0:
-                    print(f"Menunggu {delay:.0f} detik hingga reset harian berikutnya sesuai jadwal.")
                     await asyncio.sleep(delay)
                 else:
-                    print("Waktu reset harian sudah lewat. Melakukan reset segera.")
                     await self._perform_daily_reset()
 
-            except Exception as e:
-                print(f"Error memuat jadwal reset harian: {e}. Mengatur jadwal awal sekarang.")
+            except Exception:
                 await self._perform_daily_reset()
         else:
-            print("Tidak ada jadwal reset harian. Mengatur jadwal awal sekarang.")
             await self._perform_daily_reset()
-            
-        print("Loop reset harian siap untuk dimulai.")
 
     @commands.command(name="resetcache")
     @commands.has_permissions(administrator=True)
@@ -782,22 +852,32 @@ class Notif(commands.Cog, name="🔔 Notification"):
         await ctx.send(embed=embed)
 
     async def _generate_jarkasih_hype(self, link_type):
-        tipe_konten = "Live Stream" if link_type == "live" else "Video YouTube" if link_type in ["upload", "premier"] else "Video TikTok"
+        tipe_konten_map = {
+            "live": "Live Stream YouTube",
+            "upload": "Video YouTube",
+            "premier": "Premiere YouTube",
+            "tiktok": "Video TikTok",
+            "tiktok_live": "Live Stream TikTok",
+            "instagram": "Postingan/Reel Instagram",
+            "instagram_live": "Live Stream Instagram"
+        }
+        tipe_konten = tipe_konten_map.get(link_type, "Konten Terbaru")
+        
         prompt = f"""
         Lu adalah Jarkasih, bot skena/kalcer ala anak Jaksel yang asik, edgy, dan ceplas-ceplos.
         Tugas lu: Kasih tau warga server kalau ada {tipe_konten} baru yang masuk.
 
         ATURAN GAYA BAHASA MUTLAK:
-        1. WAJIB pakai gaya bahasa 'Kalcer' yang natural nyampur sama slang Western/Inggris (contoh: literally, honestly, damn, sick, hype, drop, chill, make sense, bro, dsb).
-        2. SANGAT PENTING: Jangan melulu pakai kata "FOMO", "vibes", atau "legit"! Lu boleh pakai sesekali, tapi rotasi dengan kosakata western lain biar nggak basi, cringe, dan kelihatan natural.
-        3. Campur dengan bahasa tongkrongan (lo-gue, anjir, woy, cuy, buset).
-        4. Ganti-ganti *mood* lu: kadang ngegas ("Damn bro, lu harus nonton ini!"), kadang santai ("Honestly ini sick banget sih, chill aja sambil nonton"), kadang ngeledek.
-        5. Cukup 1-2 kalimat pendek. JANGAN pakai hashtag (#) dan JANGAN ngetik URL-nya.
+        1. WAJIB pakai gaya bahasa 'Kalcer' yang natural nyampur sama slang Western/Inggris.
+        2. SANGAT PENTING: Jangan melulu pakai kata FOMO, vibes, atau legit! Lu boleh pakai sesekali, tapi rotasi dengan kosakata western lain.
+        3. Campur dengan bahasa tongkrongan.
+        4. Ganti-ganti mood lu.
+        5. Cukup 1-2 kalimat pendek. JANGAN pakai hashtag dan JANGAN ngetik URL-nya.
 
         Berikan 1 respon acak lu sekarang:
         """
         
-        fallback_text = f"Yo bro, {tipe_konten} terbaru just dropped! Honestly lu mending chill dan sikat tontonannya sekarang!"
+        fallback_text = f"Halo semua! Ada {tipe_konten} baru yang sudah tersedia. Yuk langsung cek dan tonton sekarang!"
         
         models_to_try = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite']
         
@@ -806,21 +886,21 @@ class Notif(commands.Cog, name="🔔 Notification"):
             for _ in range(attempts):
                 try:
                     model = genai.GenerativeModel(model_name)
-                    response = await model.generate_content_async(prompt)
+                    response = await asyncio.wait_for(model.generate_content_async(prompt), timeout=60.0)
                     if response.text:
                         return response.text.strip().replace('"', '')
+                except asyncio.TimeoutError:
+                    return fallback_text
                 except google_exceptions.ResourceExhausted:
                     if rotate_api_key():
                         await asyncio.sleep(1)
                         continue
                     else:
                         break 
-                except Exception as e:
-                    print(f"Error AI Notif ({model_name}): {e}")
+                except Exception:
                     break 
                     
         return fallback_text
-
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -838,20 +918,17 @@ class Notif(commands.Cog, name="🔔 Notification"):
         unique_id = self._get_unique_video_id(link_for_send)
         
         if unique_id:
-            if unique_id in self.config.get("recent_video_ids", []):
-                if unique_id == self.config.get("last_link_after_reset"): 
-                    pass
-                else:
+            recent_ids = self.config.get("recent_video_ids", [])
+            if unique_id in recent_ids:
+                try:
                     await message.reply("⚠️ Tautan ini sudah pernah dikirim sebelumnya dan ada dalam cache. Tidak akan dikirim ulang untuk menghindari duplikasi.")
-                    return
-        
-        if unique_id:
+                except Exception:
+                    pass
+                return
+                
             if "recent_video_ids" not in self.config:
                 self.config["recent_video_ids"] = []
-            
-            if unique_id == self.config.get("last_link_after_reset"):
-                 self.config["last_link_after_reset"] = None
-                 
+                
             self.config["recent_video_ids"].append(unique_id)
             if len(self.config["recent_video_ids"]) > 999:
                 self.config["recent_video_ids"].pop(0)
@@ -881,8 +958,8 @@ class Notif(commands.Cog, name="🔔 Notification"):
                         tf.write(cookies_content)
                         temp_file_name = tf.name
                     cookie_path = temp_file_name
-                except Exception as e:
-                    print(f"Error memproses Base64 cookies: {e}")
+                except Exception:
+                    pass
             
             try:
                 youtube_title, youtube_description, youtube_thumbnail, extracted_url = await loop.run_in_executor(
@@ -961,21 +1038,27 @@ class Notif(commands.Cog, name="🔔 Notification"):
                             final_embed_description = final_embed_description.replace("{url}", video_url)
 
                 
-                elif link_type == "tiktok":
+                elif link_type in ["tiktok", "tiktok_live", "instagram", "instagram_live"]:
+                    tipe_str = "Video TikTok"
+                    if link_type == "tiktok_live": tipe_str = "TikTok Live"
+                    elif link_type == "instagram": tipe_str = "Postingan Instagram"
+                    elif link_type == "instagram_live": tipe_str = "Instagram Live"
+
                     if final_content:
-                        final_content = final_content.replace("{judul}", "Video TikTok")
+                        final_content = final_content.replace("{judul}", tipe_str)
                         if self._is_valid_url(link_for_send):
                             final_content = final_content.replace("{url}", link_for_send)
                     
                     if final_embed_title:
-                        final_embed_title = final_embed_title.replace("{judul}", "Video TikTok")
+                        final_embed_title = final_embed_title.replace("{judul}", tipe_str)
                         if self._is_valid_url(link_for_send):
                             final_embed_title = final_embed_title.replace("{url}", link_for_send)
                     elif not final_embed_title and use_embed:
+                        icon_str = "📱" if "tiktok" in link_type else "📸" if link_type == "instagram" else "🔴"
                         if self._is_valid_url(link_for_send):
-                            final_embed_title = f"[📱 Video TikTok]({link_for_send})"
+                            final_embed_title = f"[{icon_str} {tipe_str}]({link_for_send})"
                         else:
-                            final_embed_title = "📱 Video TikTok"
+                            final_embed_title = f"{icon_str} {tipe_str}"
 
                     if final_embed_description:
                         final_embed_description = final_embed_description.replace("{deskripsi}", "")
@@ -1026,8 +1109,8 @@ class Notif(commands.Cog, name="🔔 Notification"):
 
                 await target_channel.send(content=message_content, embed=embed, view=view)
                 
-            except Exception as e:
-                print(f"Error sending notification for path {path_data}: {e}")
+            except Exception:
+                pass
 
     def _is_valid_url(self, url):
         try:
