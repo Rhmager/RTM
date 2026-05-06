@@ -1,0 +1,48 @@
+{
+    "targets": {
+        "rnboyz": {
+            "channels": [
+                771629447253590036
+            ],
+            "last_post": "",
+            "last_story": "",
+            "custom_messages": {
+                "post": {
+                    "title": "[📸 Postingan Baru]({url})",
+                    "description": "Ada feed baru nih dari @{username}!\n\n{url}",
+                    "content": "<@&1498673916208746506> Update Feed IG!",
+                    "button_label": "Lihat Postingan",
+                    "button_style": 1,
+                    "button_color": "#E1306C",
+                    "embed_color": "#E1306C",
+                    "use_embed": false
+                },
+                "reel": {
+                    "title": "[🎥 Reel Baru]({url})",
+                    "description": "Ada Reel baru dari @{username}!\n\n{url}",
+                    "content": "@everyone Update Reel IG!",
+                    "button_label": "Tonton Reel",
+                    "button_style": 1,
+                    "button_color": "#E1306C",
+                    "embed_color": "#E1306C",
+                    "use_embed": true
+                },
+                "story": {
+                    "title": "[⏱️ Story Baru]({url})",
+                    "description": "Ada Story baru dari @{username}!\n\n{url}",
+                    "content": "<@&1498673916208746506> Update Story IG!",
+                    "button_label": "Lihat Story",
+                    "button_style": 4,
+                    "button_color": "#ed4245",
+                    "embed_color": "#f1c40f",
+                    "use_embed": false
+                }
+            },
+            "toggles": {
+                "post": true,
+                "reel": true,
+                "story": true
+            }
+        }
+    }
+}
