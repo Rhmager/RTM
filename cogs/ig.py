@@ -267,7 +267,7 @@ class IgTypeSelectView(discord.ui.View):
             self.stop()
         type_select.callback = callback
         self.add_item(type_select)
-        back_button = discord.ui.Button(label="← Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
+        back_button = discord.ui.Button(label="Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(content="Pilih Akun Instagram yang akan dikonfigurasi:", embed=None, view=IgTargetSelectView(self.cog))
             self.stop()
@@ -321,7 +321,7 @@ class InstagramTracker(commands.Cog):
 
         self.default_messages = {
             "post": {
-                "title": "[📸 Postingan Baru]({url})",
+                "title": "[Postingan Baru]({url})",
                 "description": "Ada feed baru nih dari @{username}!\n\n{url}",
                 "content": "@everyone Update Feed IG!",
                 "button_label": "Lihat Postingan",
@@ -331,7 +331,7 @@ class InstagramTracker(commands.Cog):
                 "use_embed": True
             },
             "reel": {
-                "title": "[🎥 Reel Baru]({url})",
+                "title": "[Reel Baru]({url})",
                 "description": "Ada Reel baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Reel IG!",
                 "button_label": "Tonton Reel",
@@ -341,7 +341,7 @@ class InstagramTracker(commands.Cog):
                 "use_embed": True
             },
             "story": {
-                "title": "[⏱️ Story Baru]({url})",
+                "title": "[Story Baru]({url})",
                 "description": "Ada Story baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Story IG!",
                 "button_label": "Lihat Story",
@@ -518,15 +518,17 @@ class InstagramTracker(commands.Cog):
 
         headers = {
             "x-rapidapi-key": self.api_key,
-            "x-rapidapi-host": "instagram-scraper-api2.p.rapidapi.com"
+            "x-rapidapi-host": "instagram120.p.rapidapi.com",
+            "Content-Type": "application/json"
         }
 
         async with aiohttp.ClientSession() as session:
             for username, data in targets.items():
                 try:
-                    url_posts = "https://instagram-scraper-api2.p.rapidapi.com/v1/user_posts"
-                    params = {"username_or_id_or_url": username}
-                    async with session.get(url_posts, headers=headers, params=params) as resp:
+                    payload_data = {"username": username}
+                    
+                    url_posts = "https://instagram120.p.rapidapi.com/api/instagram/posts"
+                    async with session.post(url_posts, headers=headers, json=payload_data) as resp:
                         if resp.status == 200:
                             res_json = await resp.json()
                             items = res_json.get("data", {}).get("items", [])
@@ -565,8 +567,8 @@ class InstagramTracker(commands.Cog):
                                         config_msg = data["custom_messages"].get(content_type, self.default_messages[content_type])
                                         await self._send_notification(username, data["channels"], post_url, direct_media_url, is_video, config_msg)
 
-                    url_stories = "https://instagram-scraper-api2.p.rapidapi.com/v1/user_stories"
-                    async with session.get(url_stories, headers=headers, params=params) as resp_st:
+                    url_stories = "https://instagram120.p.rapidapi.com/api/instagram/stories"
+                    async with session.post(url_stories, headers=headers, json=payload_data) as resp_st:
                         if resp_st.status == 200:
                             res_json_st = await resp_st.json()
                             items_st = res_json_st.get("data", {}).get("items", [])
@@ -595,7 +597,7 @@ class InstagramTracker(commands.Cog):
                                         config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
                                         await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
 
-                except Exception as e:
+                except Exception:
                     pass
                 await asyncio.sleep(5)
 
@@ -631,9 +633,9 @@ class InstagramTracker(commands.Cog):
 
         if is_video and direct_media_url:
             if msg_content:
-                msg_content += f"\n👇 **[Putar Video Langsung]({direct_media_url})**"
+                msg_content += f"\n[Putar Video Langsung]({direct_media_url})"
             else:
-                msg_content = f"👇 **[Putar Video Langsung]({direct_media_url})**"
+                msg_content = f"[Putar Video Langsung]({direct_media_url})"
 
         button_label = config_msg.get('button_label', 'Buka Instagram')
         button_style_value = config_msg.get('button_style', discord.ButtonStyle.primary.value)
