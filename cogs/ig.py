@@ -8,7 +8,9 @@ import logging
 import re
 from pymongo import MongoClient
 from functools import partial
+from dotenv import load_dotenv
 
+load_dotenv()
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def get_config_path(cog, username, type_key, field_key=None):
@@ -312,12 +314,17 @@ class InstagramTracker(commands.Cog):
         self.api_key = os.getenv("RAPIDAPI_KEY")
         self.mongo_uri = os.getenv("MONGO_URI")
         
+        self.collection = None
         if self.mongo_uri:
-            self.mongo_client = MongoClient(self.mongo_uri)
-            self.db = self.mongo_client['rtm_database']
-            self.collection = self.db['ig_tracker']
-        else:
-            self.collection = None
+            try:
+                self.mongo_client = MongoClient(self.mongo_uri)
+                self.db = self.mongo_client['rtm_database']
+                self.collection = self.db['ig_tracker']
+                self.mongo_client.admin.command('ping')
+                logging.info("IG Tracker: Berhasil terhubung ke MongoDB")
+            except Exception as e:
+                logging.error(f"IG Tracker: Gagal koneksi MongoDB: {e}")
+                self.collection = None
 
         self.default_messages = {
             "post": {
@@ -352,37 +359,54 @@ class InstagramTracker(commands.Cog):
             }
         }
         
-        self.config = self.load_local()
+        self.config = {"targets": {}}
+        self.load_data()
+        self.monitor_task.start()
 
-    def load_local(self):
-        if not os.path.exists(self.config_file):
-            os.makedirs(self.data_dir, exist_ok=True)
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump({"targets": {}}, f, indent=4)
-            return {"targets": {}}
-        try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                for username, target_data in data.get("targets", {}).items():
-                    if "custom_messages" not in target_data:
-                        target_data["custom_messages"] = {}
-                    if "toggles" not in target_data:
-                        target_data["toggles"] = {"post": True, "reel": True, "story": True}
-                    if "recent_posts" not in target_data:
-                        target_data["recent_posts"] = []
-                    if "recent_stories" not in target_data:
-                        target_data["recent_stories"] = []
-                    for msg_type, default_msg in self.default_messages.items():
-                        if msg_type not in target_data["custom_messages"]:
-                            target_data["custom_messages"][msg_type] = default_msg.copy()
-                return data
-        except Exception:
-            return {"targets": {}}
+    def load_data(self):
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    local_data = json.load(f)
+                    if "targets" in local_data:
+                        self.config["targets"] = local_data["targets"]
+            except Exception as e:
+                logging.error(f"Error load JSON: {e}")
+
+        if self.collection is not None:
+            try:
+                mongo_data = self.collection.find_one({"_id": "ig_config"})
+                if mongo_data and "targets" in mongo_data:
+                    self.config["targets"] = mongo_data["targets"]
+                    logging.info("IG Tracker: Data tersinkronisasi dari MongoDB")
+            except Exception as e:
+                logging.error(f"Error narik MongoDB: {e}")
+
+        for username, target_data in self.config.get("targets", {}).items():
+            if "custom_messages" not in target_data:
+                target_data["custom_messages"] = {}
+            if "toggles" not in target_data:
+                target_data["toggles"] = {"post": True, "reel": True, "story": True}
+            if "recent_posts" not in target_data:
+                target_data["recent_posts"] = []
+            if "recent_stories" not in target_data:
+                target_data["recent_stories"] = []
+            for msg_type, default_msg in self.default_messages.items():
+                if msg_type not in target_data["custom_messages"]:
+                    target_data["custom_messages"][msg_type] = default_msg.copy()
+        
+        self.save_local()
+
+    def cog_unload(self):
+        self.monitor_task.cancel()
 
     def save_local(self):
         os.makedirs(self.data_dir, exist_ok=True)
-        with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, indent=4)
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4)
+        except Exception as e:
+            logging.error(f"Error save JSON: {e}")
 
     def save_config(self):
         self.save_local()
@@ -393,34 +417,8 @@ class InstagramTracker(commands.Cog):
                     {"$set": {"targets": self.config.get("targets", {})}},
                     upsert=True
                 )
-            except Exception:
-                pass
-
-    async def cog_load(self):
-        if self.collection is not None:
-            try:
-                data = self.collection.find_one({"_id": "ig_config"})
-                if data and "targets" in data:
-                    for username, target_data in data["targets"].items():
-                        if "custom_messages" not in target_data:
-                            target_data["custom_messages"] = {}
-                        if "toggles" not in target_data:
-                            target_data["toggles"] = {"post": True, "reel": True, "story": True}
-                        if "recent_posts" not in target_data:
-                            target_data["recent_posts"] = []
-                        if "recent_stories" not in target_data:
-                            target_data["recent_stories"] = []
-                        for msg_type, default_msg in self.default_messages.items():
-                            if msg_type not in target_data["custom_messages"]:
-                                target_data["custom_messages"][msg_type] = default_msg.copy()
-                    self.config["targets"] = data["targets"]
-                    self.save_local()
-            except Exception:
-                pass
-        self.monitor_task.start()
-
-    def cog_unload(self):
-        self.monitor_task.cancel()
+            except Exception as e:
+                logging.error(f"Error save MongoDB: {e}")
 
     @commands.command(name='iga')
     @commands.has_permissions(administrator=True)
