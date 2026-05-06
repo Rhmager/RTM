@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import logging
 import re
+from pymongo import MongoClient
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -15,13 +16,18 @@ class InstagramTracker(commands.Cog):
         self.data_dir = 'data'
         self.config_file = os.path.join(self.data_dir, 'instagram_tracker.json')
         self.api_key = os.getenv("RAPIDAPI_KEY")
-        self.config = self.load_config()
-        self.monitor_task.start()
+        self.mongo_uri = os.getenv("MONGO_URI")
+        
+        if self.mongo_uri:
+            self.mongo_client = MongoClient(self.mongo_uri)
+            self.db = self.mongo_client['rtm_database']
+            self.collection = self.db['ig_tracker']
+        else:
+            self.collection = None
 
-    def cog_unload(self):
-        self.monitor_task.cancel()
+        self.config = self.load_local()
 
-    def load_config(self):
+    def load_local(self):
         if not os.path.exists(self.config_file):
             os.makedirs(self.data_dir, exist_ok=True)
             with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -33,10 +39,36 @@ class InstagramTracker(commands.Cog):
         except Exception:
             return {"targets": {}}
 
-    def save_config(self):
+    def save_local(self):
         os.makedirs(self.data_dir, exist_ok=True)
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(self.config, f, indent=4)
+
+    def save_config(self):
+        self.save_local()
+        if self.collection is not None:
+            try:
+                self.collection.update_one(
+                    {"_id": "ig_config"},
+                    {"$set": {"targets": self.config.get("targets", {})}},
+                    upsert=True
+                )
+            except Exception:
+                pass
+
+    async def cog_load(self):
+        if self.collection is not None:
+            try:
+                data = self.collection.find_one({"_id": "ig_config"})
+                if data and "targets" in data:
+                    self.config["targets"] = data["targets"]
+                    self.save_local()
+            except Exception:
+                pass
+        self.monitor_task.start()
+
+    def cog_unload(self):
+        self.monitor_task.cancel()
 
     @commands.command(name='iga')
     @commands.has_permissions(administrator=True)
