@@ -8,16 +8,6 @@ import logging
 import re
 from pymongo import MongoClient
 from functools import partial
-from dotenv import load_dotenv
-
-load_dotenv()
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-def get_config_path(cog, username, type_key, field_key=None):
-    target_data = cog.config["targets"].get(username)
-    if not target_data: return None
-    path = target_data["custom_messages"][type_key]
-    return path.get(field_key, "") if field_key else path
 
 class IgTextModal(discord.ui.Modal):
     def __init__(self, title, label, default_value, parent_view, type_key, field_key, username):
@@ -46,7 +36,11 @@ class IgButtonLabelModal(discord.ui.Modal, title="Atur Tombol Notifikasi"):
         self.parent_view = parent_view
         self.type_key = type_key
         self.username = username
-        current_label = get_config_path(parent_view.cog, username, type_key, "button_label")
+        
+        target_data = parent_view.cog.config["targets"].get(username)
+        path = target_data["custom_messages"][type_key] if target_data else {}
+        current_label = path.get("button_label", "")
+        
         self.label_input = discord.ui.TextInput(
             label="Label Tombol",
             default=current_label,
@@ -67,7 +61,11 @@ class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
         self.type_key = type_key
         self.username = username
         self.color_type = color_type
-        current_color = get_config_path(parent_view.cog, username, type_key, "embed_color" if color_type == 'embed' else "button_color")
+        
+        target_data = parent_view.cog.config["targets"].get(username)
+        path = target_data["custom_messages"][type_key] if target_data else {}
+        current_color = path.get("embed_color" if color_type == 'embed' else "button_color", "")
+        
         self.color_input = discord.ui.TextInput(
             label=f"Warna HEX {color_type.capitalize()}",
             default=current_color or "#E1306C",
@@ -207,17 +205,23 @@ class IgMessageConfigView(discord.ui.View):
 
     @discord.ui.button(label="Atur Pesan Biasa", style=discord.ButtonStyle.secondary, row=0)
     async def set_content_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        current_value = get_config_path(self.cog, self.username, self.type_key, "content")
+        target_data = self.cog.config["targets"].get(self.username)
+        path = target_data["custom_messages"][self.type_key] if target_data else {}
+        current_value = path.get("content", "")
         await interaction.response.send_modal(IgTextModal("Atur Pesan Biasa", "Isi Pesan", current_value, self, self.type_key, "content", self.username))
 
     @discord.ui.button(label="Atur Judul Embed", style=discord.ButtonStyle.secondary, row=0)
     async def set_title_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        current_value = get_config_path(self.cog, self.username, self.type_key, "title")
+        target_data = self.cog.config["targets"].get(self.username)
+        path = target_data["custom_messages"][self.type_key] if target_data else {}
+        current_value = path.get("title", "")
         await interaction.response.send_modal(IgTextModal("Atur Judul Embed", "Judul Embed", current_value, self, self.type_key, "title", self.username))
 
     @discord.ui.button(label="Atur Deskripsi Embed", style=discord.ButtonStyle.secondary, row=0)
     async def set_desc_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        current_value = get_config_path(self.cog, self.username, self.type_key, "description")
+        target_data = self.cog.config["targets"].get(self.username)
+        path = target_data["custom_messages"][self.type_key] if target_data else {}
+        current_value = path.get("description", "")
         await interaction.response.send_modal(IgTextModal("Atur Deskripsi Embed", "Deskripsi Embed", current_value, self, self.type_key, "description", self.username))
 
     @discord.ui.button(label="Atur Tombol & Warna", style=discord.ButtonStyle.secondary, row=1)
@@ -311,21 +315,19 @@ class InstagramTracker(commands.Cog):
         self.bot = bot
         self.data_dir = 'data'
         self.config_file = os.path.join(self.data_dir, 'instagram_tracker.json')
+        self.config_db_path = self.config_file.replace('\\', '/')
         self.api_key = os.getenv("RAPIDAPI_KEY")
-        self.mongo_uri = os.getenv("MONGO_URI")
-        
+        self.mongo_uri = os.getenv("MONGODB_URI")
         self.collection = None
+
         if self.mongo_uri:
             try:
                 self.mongo_client = MongoClient(self.mongo_uri)
-                self.db = self.mongo_client['rtm_database']
-                self.collection = self.db['ig_tracker']
-                self.mongo_client.admin.command('ping')
-                logging.info("IG Tracker: Berhasil terhubung ke MongoDB")
-            except Exception as e:
-                logging.error(f"IG Tracker: Gagal koneksi MongoDB: {e}")
-                self.collection = None
-
+                self.db = self.mongo_client["reSwan"]
+                self.collection = self.db["Data collection"]
+            except Exception:
+                pass
+        
         self.default_messages = {
             "post": {
                 "title": "[📸 Postingan Baru]({url})",
@@ -363,26 +365,36 @@ class InstagramTracker(commands.Cog):
         self.load_data()
         self.monitor_task.start()
 
-    def load_data(self):
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    local_data = json.load(f)
-                    if "targets" in local_data:
-                        self.config["targets"] = local_data["targets"]
-            except Exception as e:
-                logging.error(f"Error load JSON: {e}")
+    def cog_unload(self):
+        self.monitor_task.cancel()
 
+    def load_data(self):
+        loaded_from_mongo = False
         if self.collection is not None:
             try:
-                mongo_data = self.collection.find_one({"_id": "ig_config"})
-                if mongo_data and "targets" in mongo_data:
-                    self.config["targets"] = mongo_data["targets"]
-                    logging.info("IG Tracker: Data tersinkronisasi dari MongoDB")
-            except Exception as e:
-                logging.error(f"Error narik MongoDB: {e}")
+                stored = self.collection.find_one({"_id": "latest_backup"})
+                if stored and "backup" in stored:
+                    backup_dict = stored["backup"]
+                    ig_data = backup_dict.get(self.config_db_path) or backup_dict.get(self.config_db_path.replace('/', '\\'))
+                    if ig_data:
+                        self.config = ig_data
+                        loaded_from_mongo = True
+            except Exception:
+                pass
 
-        for username, target_data in self.config.get("targets", {}).items():
+        if not loaded_from_mongo:
+            if os.path.exists(self.config_file):
+                try:
+                    with open(self.config_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        if "targets" in data:
+                            self.config["targets"] = data["targets"]
+                except Exception:
+                    pass
+            else:
+                os.makedirs(self.data_dir, exist_ok=True)
+
+        for username, target_data in self.config.setdefault("targets", {}).items():
             if "custom_messages" not in target_data:
                 target_data["custom_messages"] = {}
             if "toggles" not in target_data:
@@ -397,28 +409,25 @@ class InstagramTracker(commands.Cog):
         
         self.save_local()
 
-    def cog_unload(self):
-        self.monitor_task.cancel()
-
     def save_local(self):
         os.makedirs(self.data_dir, exist_ok=True)
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=4)
-        except Exception as e:
-            logging.error(f"Error save JSON: {e}")
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
 
     def save_config(self):
         self.save_local()
         if self.collection is not None:
             try:
                 self.collection.update_one(
-                    {"_id": "ig_config"},
-                    {"$set": {"targets": self.config.get("targets", {})}},
+                    {"_id": "latest_backup"},
+                    {"$set": {f"backup.{self.config_db_path}": self.config}},
                     upsert=True
                 )
-            except Exception as e:
-                logging.error(f"Error save MongoDB: {e}")
+            except Exception:
+                pass
 
     @commands.command(name='iga')
     @commands.has_permissions(administrator=True)
@@ -648,8 +657,8 @@ class InstagramTracker(commands.Cog):
                                     config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
                                     await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
 
-                except Exception as e:
-                    logging.error(f"Error monitoring IG {username}: {e}")
+                except Exception:
+                    pass
                 
                 await asyncio.sleep(5)
 
