@@ -25,7 +25,7 @@
                     "embed_thumbnail": false
                 },
                 "premier": {
-                    "title": "ðŸŽ¬ Premiere Segera:",
+                    "title": "🎬 Premiere Segera:",
                     "description": "Video premiere akan segera tayang!",
                     "content": "Ada video premiere!",
                     "button_label": "Tonton Premiere",
@@ -45,7 +45,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "Ada video TikTok baru nih!",
                     "button_label": "Tonton di TikTok",
@@ -56,7 +56,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -67,7 +67,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -78,7 +78,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -95,7 +95,7 @@
             "target_id": 1255234363373916232,
             "custom_messages": {
                 "live": {
-                    "title": "ðŸ”´ **{judul}**",
+                    "title": "🔴 **{judul}**",
                     "description": "Yuk gabung di live stream ini!",
                     "content": "@everyone Live stream dimulai!",
                     "button_label": "Tonton Live",
@@ -105,7 +105,7 @@
                     "embed_thumbnail": true
                 },
                 "upload": {
-                    "title": "âœ¨ **{judul}**",
+                    "title": "✨ **{judul}**",
                     "description": "Video baru diupload, jangan sampai ketinggalan!",
                     "content": "Ada video baru nih, cekidot!",
                     "button_label": "Tonton Video",
@@ -115,7 +115,7 @@
                     "embed_thumbnail": true
                 },
                 "premier": {
-                    "title": "ðŸŽ¬ **Premiere Segera: {judul}**",
+                    "title": "🎬 **Premiere Segera: {judul}**",
                     "description": "Video premiere akan segera tayang!",
                     "content": "Ada video premiere!",
                     "button_label": "Tonton Premiere",
@@ -135,7 +135,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "Ada video TikTok baru nih!",
                     "button_label": "Tonton di TikTok",
@@ -146,7 +146,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -157,7 +157,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -168,7 +168,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -185,7 +185,7 @@
             "target_id": 771629447253590036,
             "custom_messages": {
                 "live": {
-                    "title": "ðŸ”´ **{judul}**",
+                    "title": "🔴 **{judul}**",
                     "description": "Yuk gabung di live stream ini!",
                     "content": "",
                     "button_label": "Tonton Live",
@@ -195,7 +195,7 @@
                     "embed_thumbnail": false
                 },
                 "upload": {
-                    "title": "âœ¨ **{judul}**",
+                    "title": "✨ **{judul}**",
                     "description": "Video baru diupload, jangan sampai ketinggalan!",
                     "content": "",
                     "button_label": "Tonton Video",
@@ -205,7 +205,7 @@
                     "embed_thumbnail": false
                 },
                 "premier": {
-                    "title": "ðŸŽ¬ **Premiere Segera: {judul}**",
+                    "title": "🎬 **Premiere Segera: {judul}**",
                     "description": "Video premiere akan segera tayang!",
                     "content": "",
                     "button_label": "Tonton Premiere",
@@ -225,7 +225,7 @@
                     "embed_thumbnail": true
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "Ada video TikTok baru nih!",
                     "button_label": "Tonton di TikTok",
@@ -236,7 +236,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -247,7 +247,7 @@
                     "embed_thumbnail": false
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -258,7 +258,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -275,7 +275,7 @@
             "target_id": 759210443771871252,
             "custom_messages": {
                 "live": {
-                    "title": "ðŸ”´ **{judul}**",
+                    "title": "🔴 **{judul}**",
                     "description": "Yuk gabung di live stream ini!",
                     "content": "@everyone Live stream dimulai!",
                     "button_label": "Tonton Live",
@@ -285,7 +285,7 @@
                     "embed_thumbnail": false
                 },
                 "upload": {
-                    "title": "âœ¨ **{judul}**",
+                    "title": "✨ **{judul}**",
                     "description": "Video baru diupload, jangan sampai ketinggalan!",
                     "content": "Ada video baru nih, cekidot!",
                     "button_label": "Tonton Video",
@@ -295,7 +295,7 @@
                     "embed_thumbnail": false
                 },
                 "premier": {
-                    "title": "ðŸŽ¬ **Premiere Segera: {judul}**",
+                    "title": "🎬 **Premiere Segera: {judul}**",
                     "description": "Video premiere akan segera tayang!",
                     "content": "Ada video premiere!",
                     "button_label": "Tonton Premiere",
@@ -315,7 +315,7 @@
                     "embed_thumbnail": true
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "Ada video TikTok baru nih!",
                     "button_label": "Tonton di TikTok",
@@ -326,7 +326,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -337,7 +337,7 @@
                     "embed_thumbnail": false
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -348,7 +348,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -376,7 +376,7 @@
                     "button_color": "#ed4245"
                 },
                 "upload": {
-                    "title": "âœ¨ **{judul}**",
+                    "title": "✨ **{judul}**",
                     "description": "Tonton di {url}\n\n\nDeskripsi :\n\n{deskripsi}",
                     "content": "Ada video baru nih, cekidot!",
                     "button_label": "Tonton Video",
@@ -387,7 +387,7 @@
                     "button_color": "#57f287"
                 },
                 "premier": {
-                    "title": "ðŸŽ¬ **Premiere Segera: {judul}**",
+                    "title": "🎬 **Premiere Segera: {judul}**",
                     "description": "Video premiere akan segera tayang!",
                     "content": "Ada video premiere!",
                     "button_label": "Tonton Premiere",
@@ -407,7 +407,7 @@
                     "embed_thumbnail": true
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "{ai_hype}",
                     "button_label": "Tonton di TikTok",
@@ -418,7 +418,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -429,7 +429,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -440,7 +440,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -468,7 +468,7 @@
                     "embed_thumbnail": false
                 },
                 "upload": {
-                    "title": "[âœ¨ {judul}]({url})",
+                    "title": "[✨ {judul}]({url})",
                     "description": "Video baru diupload, jangan sampai ketinggalan!\n\n{url}",
                     "content": "{ai_hype}",
                     "button_label": "Tonton Video",
@@ -479,7 +479,7 @@
                     "embed_thumbnail": false
                 },
                 "premier": {
-                    "title": "[ðŸŽ¬ Premiere Segera: {judul}]({url})",
+                    "title": "[🎬 Premiere Segera: {judul}]({url})",
                     "description": "Video premiere akan segera tayang!\n\n{url}",
                     "content": "{ai_hype}",
                     "button_label": "Tonton Premiere",
@@ -490,7 +490,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "{ai_hype}",
                     "button_label": "Tonton di TikTok",
@@ -501,7 +501,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -512,7 +512,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -523,7 +523,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
@@ -540,7 +540,7 @@
             "target_id": 771629447253590036,
             "custom_messages": {
                 "live": {
-                    "title": "[ðŸ”´ {judul}]({url})",
+                    "title": "[🔴 {judul}]({url})",
                     "description": "Yuk gabung di live stream ini!\n\n{url}",
                     "content": "<@&1498673916208746506> {ai_hype}",
                     "button_label": "Tonton Live",
@@ -551,7 +551,7 @@
                     "embed_thumbnail": false
                 },
                 "upload": {
-                    "title": "[âœ¨ {judul}]({url})",
+                    "title": "[✨ {judul}]({url})",
                     "description": "Video baru diupload, jangan sampai ketinggalan!\n\n{url}",
                     "content": "<@&1498673916208746506> {ai_hype}",
                     "button_label": "Tonton Video",
@@ -562,7 +562,7 @@
                     "embed_thumbnail": false
                 },
                 "premier": {
-                    "title": "[ðŸŽ¬ Premiere Segera: {judul}]({url})",
+                    "title": "[🎬 Premiere Segera: {judul}]({url})",
                     "description": "Video premiere akan segera tayang!\n\n{url}",
                     "content": "<@&1498673916208746506> {ai_hype}",
                     "button_label": "Tonton Premiere",
@@ -573,7 +573,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok": {
-                    "title": "[ðŸ“± {judul}]({url})",
+                    "title": "[📱 {judul}]({url})",
                     "description": "Cek video TikTok terbaru!\n\n{url}",
                     "content": "<@&1498673916208746506> {ai_hype}",
                     "button_label": "Tonton di TikTok",
@@ -584,7 +584,7 @@
                     "embed_thumbnail": false
                 },
                 "tiktok_live": {
-                    "title": "[ðŸ”´ TikTok Live]({url})",
+                    "title": "[🔴 TikTok Live]({url})",
                     "description": "Ada yang lagi live di TikTok nih!\n\n{url}",
                     "content": "<@&1498673916208746506> {ai_hype}",
                     "button_label": "Tonton Live TikTok",
@@ -595,7 +595,7 @@
                     "embed_thumbnail": false
                 },
                 "instagram": {
-                    "title": "[ðŸ“¸ Instagram Post]({url})",
+                    "title": "[📸 Instagram Post]({url})",
                     "description": "Ada postingan atau Reels baru di Instagram!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Buka Instagram",
@@ -606,7 +606,7 @@
                     "embed_thumbnail": true
                 },
                 "instagram_live": {
-                    "title": "[ðŸ”´ Instagram Live]({url})",
+                    "title": "[🔴 Instagram Live]({url})",
                     "description": "Yuk join Instagram Live sekarang!\n\n{url}",
                     "content": "@everyone {ai_hype}",
                     "button_label": "Tonton IG Live",
