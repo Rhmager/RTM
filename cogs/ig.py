@@ -267,7 +267,7 @@ class IgTypeSelectView(discord.ui.View):
             self.stop()
         type_select.callback = callback
         self.add_item(type_select)
-        back_button = discord.ui.Button(label="Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
+        back_button = discord.ui.Button(label="← Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(content="Pilih Akun Instagram yang akan dikonfigurasi:", embed=None, view=IgTargetSelectView(self.cog))
             self.stop()
@@ -321,7 +321,7 @@ class InstagramTracker(commands.Cog):
 
         self.default_messages = {
             "post": {
-                "title": "[Postingan Baru]({url})",
+                "title": "[📸 Postingan Baru]({url})",
                 "description": "Ada feed baru nih dari @{username}!\n\n{url}",
                 "content": "@everyone Update Feed IG!",
                 "button_label": "Lihat Postingan",
@@ -331,7 +331,7 @@ class InstagramTracker(commands.Cog):
                 "use_embed": True
             },
             "reel": {
-                "title": "[Reel Baru]({url})",
+                "title": "[🎥 Reel Baru]({url})",
                 "description": "Ada Reel baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Reel IG!",
                 "button_label": "Tonton Reel",
@@ -341,7 +341,7 @@ class InstagramTracker(commands.Cog):
                 "use_embed": True
             },
             "story": {
-                "title": "[Story Baru]({url})",
+                "title": "[⏱️ Story Baru]({url})",
                 "description": "Ada Story baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Story IG!",
                 "button_label": "Lihat Story",
@@ -368,6 +368,10 @@ class InstagramTracker(commands.Cog):
                         target_data["custom_messages"] = {}
                     if "toggles" not in target_data:
                         target_data["toggles"] = {"post": True, "reel": True, "story": True}
+                    if "recent_posts" not in target_data:
+                        target_data["recent_posts"] = []
+                    if "recent_stories" not in target_data:
+                        target_data["recent_stories"] = []
                     for msg_type, default_msg in self.default_messages.items():
                         if msg_type not in target_data["custom_messages"]:
                             target_data["custom_messages"][msg_type] = default_msg.copy()
@@ -402,6 +406,10 @@ class InstagramTracker(commands.Cog):
                             target_data["custom_messages"] = {}
                         if "toggles" not in target_data:
                             target_data["toggles"] = {"post": True, "reel": True, "story": True}
+                        if "recent_posts" not in target_data:
+                            target_data["recent_posts"] = []
+                        if "recent_stories" not in target_data:
+                            target_data["recent_stories"] = []
                         for msg_type, default_msg in self.default_messages.items():
                             if msg_type not in target_data["custom_messages"]:
                                 target_data["custom_messages"][msg_type] = default_msg.copy()
@@ -433,8 +441,8 @@ class InstagramTracker(commands.Cog):
         if username not in targets:
             targets[username] = {
                 "channels": [],
-                "last_post": "",
-                "last_story": "",
+                "recent_posts": [],
+                "recent_stories": [],
                 "custom_messages": {},
                 "toggles": {"post": True, "reel": True, "story": True}
             }
@@ -525,80 +533,126 @@ class InstagramTracker(commands.Cog):
         async with aiohttp.ClientSession() as session:
             for username, data in targets.items():
                 try:
+                    if "recent_posts" not in data:
+                        data["recent_posts"] = []
+                    if "recent_stories" not in data:
+                        data["recent_stories"] = []
+
                     payload_data = {"username": username}
                     
                     url_posts = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     async with session.post(url_posts, headers=headers, json=payload_data) as resp:
                         if resp.status == 200:
                             res_json = await resp.json()
-                            items = res_json.get("data", {}).get("items", [])
-                            if items:
-                                latest = items[0]
-                                post_id = latest.get("id")
+                            items = []
+                            if isinstance(res_json, dict):
+                                if "result" in res_json and isinstance(res_json["result"], list):
+                                    items = res_json["result"]
+                                elif "data" in res_json and isinstance(res_json["data"], list):
+                                    items = res_json["data"]
+                                elif "data" in res_json and isinstance(res_json["data"], dict) and "items" in res_json["data"]:
+                                    items = res_json["data"]["items"]
+                                elif "items" in res_json and isinstance(res_json["items"], list):
+                                    items = res_json["items"]
+                            elif isinstance(res_json, list):
+                                items = res_json
+                            
+                            items.reverse()
+                            for item in items:
+                                post_id = str(item.get("id", item.get("pk", "")))
+                                if not post_id or post_id in data["recent_posts"]:
+                                    continue
                                 
-                                if post_id and post_id != data.get("last_post"):
-                                    data["last_post"] = post_id
-                                    self.config["targets"][username] = data
-                                    self.save_config()
-                                    
-                                    code = latest.get("code")
-                                    post_url = f"https://www.instagram.com/p/{code}/"
-                                    
-                                    direct_media_url = None
-                                    is_video = False
-                                    
-                                    if "video_versions" in latest and latest["video_versions"]:
-                                        direct_media_url = latest["video_versions"][0].get("url")
+                                data["recent_posts"].append(post_id)
+                                if len(data["recent_posts"]) > 20:
+                                    data["recent_posts"].pop(0)
+                                self.config["targets"][username] = data
+                                self.save_config()
+                                
+                                code = item.get("code", item.get("shortcode", ""))
+                                post_url = f"https://www.instagram.com/p/{code}/" if code else f"https://www.instagram.com/{username}/"
+                                
+                                direct_media_url = None
+                                is_video = False
+                                
+                                if item.get("video_url"):
+                                    direct_media_url = item.get("video_url")
+                                    is_video = True
+                                elif item.get("display_url"):
+                                    direct_media_url = item.get("display_url")
+                                elif "video_versions" in item and item["video_versions"]:
+                                    direct_media_url = item["video_versions"][0].get("url")
+                                    is_video = True
+                                elif "carousel_media" in item and item["carousel_media"]:
+                                    first_item = item["carousel_media"][0]
+                                    if "video_versions" in first_item and first_item["video_versions"]:
+                                        direct_media_url = first_item["video_versions"][0].get("url")
                                         is_video = True
-                                    elif "carousel_media" in latest and latest["carousel_media"]:
-                                        first_item = latest["carousel_media"][0]
-                                        if "video_versions" in first_item and first_item["video_versions"]:
-                                            direct_media_url = first_item["video_versions"][0].get("url")
-                                            is_video = True
-                                        elif "image_versions2" in first_item and first_item["image_versions2"].get("candidates"):
-                                            direct_media_url = first_item["image_versions2"]["candidates"][0].get("url")
-                                    elif "image_versions2" in latest and latest["image_versions2"].get("candidates"):
-                                        direct_media_url = latest["image_versions2"]["candidates"][0].get("url")
+                                    elif "image_versions2" in first_item and first_item["image_versions2"].get("candidates"):
+                                        direct_media_url = first_item["image_versions2"]["candidates"][0].get("url")
+                                elif "image_versions2" in item and item["image_versions2"].get("candidates"):
+                                    direct_media_url = item["image_versions2"]["candidates"][0].get("url")
 
-                                    content_type = "reel" if is_video else "post"
-                                    is_tracked = data.get("toggles", {}).get(content_type, True)
-                                    
-                                    if is_tracked:
-                                        config_msg = data["custom_messages"].get(content_type, self.default_messages[content_type])
-                                        await self._send_notification(username, data["channels"], post_url, direct_media_url, is_video, config_msg)
+                                content_type = "reel" if is_video else "post"
+                                is_tracked = data.get("toggles", {}).get(content_type, True)
+                                
+                                if is_tracked:
+                                    config_msg = data["custom_messages"].get(content_type, self.default_messages[content_type])
+                                    await self._send_notification(username, data["channels"], post_url, direct_media_url, is_video, config_msg)
 
                     url_stories = "https://instagram120.p.rapidapi.com/api/instagram/stories"
                     async with session.post(url_stories, headers=headers, json=payload_data) as resp_st:
                         if resp_st.status == 200:
                             res_json_st = await resp_st.json()
-                            items_st = res_json_st.get("data", {}).get("items", [])
-                            if items_st:
-                                latest_story = sorted(items_st, key=lambda x: x.get('taken_at', 0), reverse=True)[0]
-                                story_id = latest_story.get("pk")
+                            items_st = []
+                            if isinstance(res_json_st, dict):
+                                if "result" in res_json_st and isinstance(res_json_st["result"], list):
+                                    items_st = res_json_st["result"]
+                                elif "data" in res_json_st and isinstance(res_json_st["data"], list):
+                                    items_st = res_json_st["data"]
+                                elif "data" in res_json_st and isinstance(res_json_st["data"], dict) and "items" in res_json_st["data"]:
+                                    items_st = res_json_st["data"]["items"]
+                                elif "items" in res_json_st and isinstance(res_json_st["items"], list):
+                                    items_st = res_json_st["items"]
+                            elif isinstance(res_json_st, list):
+                                items_st = res_json_st
+
+                            items_st.reverse()
+                            for item in items_st:
+                                story_id = str(item.get("id", item.get("pk", "")))
+                                if not story_id or story_id in data["recent_stories"]:
+                                    continue
                                 
-                                if story_id and str(story_id) != str(data.get("last_story")):
-                                    data["last_story"] = str(story_id)
-                                    self.config["targets"][username] = data
-                                    self.save_config()
-                                    
-                                    story_url = f"https://www.instagram.com/stories/{username}/{story_id}/"
-                                    
-                                    direct_media_url_st = None
-                                    is_video_st = False
-                                    
-                                    if "video_versions" in latest_story and latest_story["video_versions"]:
-                                        direct_media_url_st = latest_story["video_versions"][0].get("url")
-                                        is_video_st = True
-                                    elif "image_versions2" in latest_story and latest_story["image_versions2"].get("candidates"):
-                                        direct_media_url_st = latest_story["image_versions2"]["candidates"][0].get("url")
+                                data["recent_stories"].append(story_id)
+                                if len(data["recent_stories"]) > 20:
+                                    data["recent_stories"].pop(0)
+                                self.config["targets"][username] = data
+                                self.save_config()
+                                
+                                story_url = f"https://www.instagram.com/stories/{username}/{story_id}/"
+                                
+                                direct_media_url_st = None
+                                is_video_st = False
+                                
+                                if item.get("video_url"):
+                                    direct_media_url_st = item.get("video_url")
+                                    is_video_st = True
+                                elif item.get("display_url"):
+                                    direct_media_url_st = item.get("display_url")
+                                elif "video_versions" in item and item["video_versions"]:
+                                    direct_media_url_st = item["video_versions"][0].get("url")
+                                    is_video_st = True
+                                elif "image_versions2" in item and item["image_versions2"].get("candidates"):
+                                    direct_media_url_st = item["image_versions2"]["candidates"][0].get("url")
 
-                                    is_tracked_st = data.get("toggles", {}).get("story", True)
-                                    if is_tracked_st:
-                                        config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
-                                        await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
+                                is_tracked_st = data.get("toggles", {}).get("story", True)
+                                if is_tracked_st:
+                                    config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
+                                    await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
 
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.error(f"Error monitoring IG {username}: {e}")
+                
                 await asyncio.sleep(5)
 
     async def _send_notification(self, username, channels, url, direct_media_url, is_video, config_msg):
@@ -633,9 +687,9 @@ class InstagramTracker(commands.Cog):
 
         if is_video and direct_media_url:
             if msg_content:
-                msg_content += f"\n[Putar Video Langsung]({direct_media_url})"
+                msg_content += f"\n👇 **[Putar Video Langsung]({direct_media_url})**"
             else:
-                msg_content = f"[Putar Video Langsung]({direct_media_url})"
+                msg_content = f"👇 **[Putar Video Langsung]({direct_media_url})**"
 
         button_label = config_msg.get('button_label', 'Buka Instagram')
         button_style_value = config_msg.get('button_style', discord.ButtonStyle.primary.value)
