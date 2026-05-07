@@ -322,11 +322,11 @@ class InstagramTracker(commands.Cog):
 
         if self.mongo_uri:
             try:
-                self.mongo_client = MongoClient(self.mongo_uri)
+                self.mongo_client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=5000)
                 self.db = self.mongo_client["reSwan"]
                 self.collection = self.db["Data collection"]
-            except Exception:
-                pass
+            except Exception as e:
+                logging.error(f"IG Tracker MongoDB Error: {e}")
         
         self.default_messages = {
             "post": {
@@ -379,8 +379,9 @@ class InstagramTracker(commands.Cog):
                     if ig_data:
                         self.config = ig_data
                         loaded_from_mongo = True
-            except Exception:
-                pass
+                        logging.info("IG Tracker: Config diload dari MongoDB.")
+            except Exception as e:
+                logging.error(f"IG Tracker gagal load Mongo: {e}")
 
         if not loaded_from_mongo:
             if os.path.exists(self.config_file):
@@ -432,6 +433,7 @@ class InstagramTracker(commands.Cog):
     @commands.command(name='iga')
     @commands.has_permissions(administrator=True)
     async def iga(self, ctx, username: str, channel_input: str = None):
+        username = username.replace('@', '').strip()
         if channel_input:
             try:
                 cid = int(re.sub(r'\D', '', channel_input))
@@ -467,6 +469,7 @@ class InstagramTracker(commands.Cog):
     @commands.command(name='igr')
     @commands.has_permissions(administrator=True)
     async def igr(self, ctx, username: str, channel_input: str = None):
+        username = username.replace('@', '').strip()
         targets = self.config.get("targets", {})
         if username not in targets:
             return await ctx.send("Akun tidak ditemukan.")
@@ -525,6 +528,7 @@ class InstagramTracker(commands.Cog):
     @tasks.loop(minutes=20)
     async def monitor_task(self):
         if not self.api_key:
+            logging.error("IG Tracker: RAPIDAPI_KEY kosong! Tidak bisa menjalankan monitor_task.")
             return
 
         targets = self.config.get("targets", {})
@@ -539,14 +543,13 @@ class InstagramTracker(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             for username, data in targets.items():
-                try:
-                    if "recent_posts" not in data:
-                        data["recent_posts"] = []
-                    if "recent_stories" not in data:
-                        data["recent_stories"] = []
+                username = username.replace('@', '').strip()
+                payload_data = {"username": username}
+                
+                if "recent_posts" not in data: data["recent_posts"] = []
+                if "recent_stories" not in data: data["recent_stories"] = []
 
-                    payload_data = {"username": username}
-                    
+                try:
                     url_posts = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     async with session.post(url_posts, headers=headers, json=payload_data) as resp:
                         if resp.status == 200:
@@ -565,6 +568,10 @@ class InstagramTracker(commands.Cog):
                                 items = res_json
                             
                             items.reverse()
+                            
+                            is_first_fetch = len(data["recent_posts"]) == 0
+                            new_posts_count = 0
+
                             for item in items:
                                 post_id = str(item.get("id", item.get("pk", "")))
                                 if not post_id or post_id in data["recent_posts"]:
@@ -575,6 +582,11 @@ class InstagramTracker(commands.Cog):
                                     data["recent_posts"].pop(0)
                                 self.config["targets"][username] = data
                                 self.save_config()
+                                
+                                new_posts_count += 1
+                                
+                                if is_first_fetch and item != items[-1]:
+                                    continue
                                 
                                 code = item.get("code", item.get("shortcode", ""))
                                 post_url = f"https://www.instagram.com/p/{code}/" if code else f"https://www.instagram.com/{username}/"
@@ -606,7 +618,15 @@ class InstagramTracker(commands.Cog):
                                 if is_tracked:
                                     config_msg = data["custom_messages"].get(content_type, self.default_messages[content_type])
                                     await self._send_notification(username, data["channels"], post_url, direct_media_url, is_video, config_msg)
+                            
+                            if new_posts_count > 0:
+                                logging.info(f"IG Tracker: Menemukan {new_posts_count} posts/reels baru untuk @{username}.")
+                        else:
+                            logging.error(f"IG Tracker Posts HTTP Error {resp.status} untuk @{username}.")
+                except Exception as e:
+                    logging.error(f"IG Tracker Exception pada Posts @{username}: {e}")
 
+                try:
                     url_stories = "https://instagram120.p.rapidapi.com/api/instagram/stories"
                     async with session.post(url_stories, headers=headers, json=payload_data) as resp_st:
                         if resp_st.status == 200:
@@ -625,6 +645,10 @@ class InstagramTracker(commands.Cog):
                                 items_st = res_json_st
 
                             items_st.reverse()
+                            
+                            is_first_fetch_st = len(data["recent_stories"]) == 0
+                            new_story_count = 0
+
                             for item in items_st:
                                 story_id = str(item.get("id", item.get("pk", "")))
                                 if not story_id or story_id in data["recent_stories"]:
@@ -636,6 +660,11 @@ class InstagramTracker(commands.Cog):
                                 self.config["targets"][username] = data
                                 self.save_config()
                                 
+                                new_story_count += 1
+                                
+                                if is_first_fetch_st and item != items_st[-1]:
+                                    continue
+
                                 story_url = f"https://www.instagram.com/stories/{username}/{story_id}/"
                                 
                                 direct_media_url_st = None
@@ -656,9 +685,13 @@ class InstagramTracker(commands.Cog):
                                 if is_tracked_st:
                                     config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
                                     await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
-
-                except Exception:
-                    pass
+                            
+                            if new_story_count > 0:
+                                logging.info(f"IG Tracker: Menemukan {new_story_count} story baru untuk @{username}.")
+                        else:
+                            logging.error(f"IG Tracker Stories HTTP Error {resp_st.status} untuk @{username}.")
+                except Exception as e:
+                    logging.error(f"IG Tracker Exception pada Stories @{username}: {e}")
                 
                 await asyncio.sleep(5)
 
