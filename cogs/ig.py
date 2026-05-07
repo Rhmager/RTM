@@ -30,7 +30,7 @@ class IgTextModal(discord.ui.Modal):
         self.parent_view.cog.save_config()
         await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
 
-class IgButtonLabelModal(discord.ui.Modal, title="Atur Tombol Notifikasi"):
+class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
     def __init__(self, parent_view, type_key, username):
         super().__init__()
         self.parent_view = parent_view
@@ -39,35 +39,10 @@ class IgButtonLabelModal(discord.ui.Modal, title="Atur Tombol Notifikasi"):
         
         target_data = parent_view.cog.config["targets"].get(username)
         path = target_data["custom_messages"][type_key] if target_data else {}
-        current_label = path.get("button_label", "")
-        
-        self.label_input = discord.ui.TextInput(
-            label="Label Tombol",
-            default=current_label,
-            style=discord.TextStyle.short,
-            max_length=80
-        )
-        self.add_item(self.label_input)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["button_label"] = self.label_input.value
-        self.parent_view.cog.save_config()
-        await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view.build_color_view())
-
-class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
-    def __init__(self, parent_view, type_key, username, color_type):
-        super().__init__()
-        self.parent_view = parent_view
-        self.type_key = type_key
-        self.username = username
-        self.color_type = color_type
-        
-        target_data = parent_view.cog.config["targets"].get(username)
-        path = target_data["custom_messages"][type_key] if target_data else {}
-        current_color = path.get("embed_color" if color_type == 'embed' else "button_color", "")
+        current_color = path.get("embed_color", "")
         
         self.color_input = discord.ui.TextInput(
-            label=f"Warna HEX {color_type.capitalize()}",
+            label="Warna HEX Embed",
             default=current_color or "#E1306C",
             style=discord.TextStyle.short,
             max_length=7,
@@ -79,14 +54,11 @@ class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
         color_value = self.color_input.value.strip()
         if not re.match(r'^#[0-9A-Fa-f]{6}$', color_value):
             return await interaction.response.send_message("Format warna HEX tidak valid! Gunakan format: #RRGGBB", ephemeral=True)
-        if self.color_type == 'embed':
-            self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["embed_color"] = color_value
-        else:
-            self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["button_color"] = color_value
+        self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["embed_color"] = color_value
         self.parent_view.cog.save_config()
         await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view.build_color_view())
 
-class IgButtonColorView(discord.ui.View):
+class IgEmbedColorView(discord.ui.View):
     def __init__(self, parent_view, type_key, username):
         super().__init__(timeout=180)
         self.parent_view = parent_view
@@ -95,12 +67,6 @@ class IgButtonColorView(discord.ui.View):
         self._create_buttons()
 
     def _create_buttons(self):
-        preset_colors = [
-            ("Biru Primary", discord.ButtonStyle.primary, "#5865f2"),
-            ("Abu Secondary", discord.ButtonStyle.secondary, "#95a5a6"),
-            ("Hijau Success", discord.ButtonStyle.success, "#57f287"),
-            ("Merah Danger", discord.ButtonStyle.danger, "#ed4245")
-        ]
         embed_colors = [
             ("Merah Live", "#e74c3c"),
             ("Hijau Upload", "#2ecc71"),
@@ -111,21 +77,11 @@ class IgButtonColorView(discord.ui.View):
             ("Pink IG", "#E1306C"),
             ("Navy", "#34495e")
         ]
-        self.add_item(discord.ui.Button(label="WARNA TOMBOL", style=discord.ButtonStyle.grey, disabled=True, row=0))
-        for label, style, hex_color in preset_colors:
-            button = discord.ui.Button(label=label, style=style, row=1)
-            async def callback(interaction: discord.Interaction, btn_style_value, btn_hex):
-                config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
-                config_msg["button_style"] = btn_style_value
-                config_msg["button_color"] = btn_hex
-                self.parent_view.cog.save_config()
-                await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
-                self.stop()
-            button.callback = partial(callback, btn_style_value=style.value, btn_hex=hex_color)
-            self.add_item(button)
-        self.add_item(discord.ui.Button(label="WARNA EMBED", style=discord.ButtonStyle.grey, disabled=True, row=2))
+        
+        self.add_item(discord.ui.Button(label="WARNA EMBED", style=discord.ButtonStyle.grey, disabled=True, row=0))
+        
         for label, hex_color in embed_colors[:4]:
-            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=3)
+            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=1)
             async def callback(interaction: discord.Interaction, embed_hex):
                 config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
                 config_msg["embed_color"] = embed_hex
@@ -134,8 +90,9 @@ class IgButtonColorView(discord.ui.View):
                 self.stop()
             button.callback = partial(callback, embed_hex=hex_color)
             self.add_item(button)
+            
         for label, hex_color in embed_colors[4:]:
-            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=4)
+            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=2)
             async def callback(interaction: discord.Interaction, embed_hex=hex_color):
                 config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
                 config_msg["embed_color"] = embed_hex
@@ -144,12 +101,14 @@ class IgButtonColorView(discord.ui.View):
                 self.stop()
             button.callback = partial(callback, embed_hex=hex_color)
             self.add_item(button)
-        custom_embed_btn = discord.ui.Button(label="Custom Warna Embed", style=discord.ButtonStyle.secondary, row=0)
+            
+        custom_embed_btn = discord.ui.Button(label="Custom Warna Embed", style=discord.ButtonStyle.secondary, row=3)
         async def custom_embed_callback(interaction: discord.Interaction):
-            await interaction.response.send_modal(IgColorInputModal(self.parent_view, self.type_key, self.username, 'embed'))
+            await interaction.response.send_modal(IgColorInputModal(self.parent_view, self.type_key, self.username))
         custom_embed_btn.callback = custom_embed_callback
         self.add_item(custom_embed_btn)
-        cancel_button = discord.ui.Button(label="Batalkan", style=discord.ButtonStyle.red, row=4)
+        
+        cancel_button = discord.ui.Button(label="Batalkan", style=discord.ButtonStyle.red, row=3)
         async def cancel_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
             self.stop()
@@ -167,13 +126,14 @@ class IgMessageConfigView(discord.ui.View):
         target_data = self.cog.config["targets"][self.username]
         config_msg = target_data["custom_messages"][self.type_key]
         embed_color_hex = config_msg.get('embed_color', '#E1306C')
-        button_color_hex = config_msg.get('button_color', '#5865f2')
+        
         try:
             color_int = int(embed_color_hex.strip("#"), 16)
             embed_color = discord.Color(color_int)
         except:
             embed_color = discord.Color.blue()
             embed_color_hex = "#E1306C"
+            
         embed = discord.Embed(
             title=f"Pengaturan IG: {self.type_key.upper()}",
             description=f"**Akun Target:** `@{self.username}`",
@@ -182,26 +142,17 @@ class IgMessageConfigView(discord.ui.View):
         embed.add_field(name="Isi Pesan Biasa", value=f"`{config_msg.get('content') or 'Belum diatur'}`\n*(Gunakan: {{username}}, {{url}})*", inline=False)
         embed.add_field(name="Judul Embed", value=f"`{config_msg.get('title') or 'Belum diatur'}`", inline=False)
         embed.add_field(name="Deskripsi Embed", value=f"`{config_msg.get('description') or 'Belum diatur'}`", inline=False)
-        embed.add_field(name="Label Tombol", value=f"`{config_msg.get('button_label') or 'Belum diatur'}`", inline=False)
         
-        button_style_value = config_msg.get('button_style', discord.ButtonStyle.primary.value)
-        try:
-            button_style_name = discord.ButtonStyle(button_style_value).name.capitalize().replace('_', ' ')
-        except ValueError:
-            button_style_name = "Primary"
-            
         use_embed = config_msg.get('use_embed', True)
         is_tracking = target_data.get("toggles", {}).get(self.type_key, True)
 
-        embed.add_field(name="Style Tombol", value=f"`{button_style_name}`", inline=True)
-        embed.add_field(name="Warna Tombol", value=f"`{button_color_hex}`", inline=True)
         embed.add_field(name="Warna Samping Embed", value=f"`{embed_color_hex}`", inline=True)
         embed.add_field(name="Status Embed", value=f"**`{'Aktif' if use_embed else 'Mati'}`**", inline=True)
         embed.add_field(name="Status Tracking", value=f"**`{'Nyala' if is_tracking else 'Mati'}`**", inline=True)
         return embed
 
     def build_color_view(self):
-        return IgButtonColorView(self, self.type_key, self.username)
+        return IgEmbedColorView(self, self.type_key, self.username)
 
     @discord.ui.button(label="Atur Pesan Biasa", style=discord.ButtonStyle.secondary, row=0)
     async def set_content_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -224,15 +175,11 @@ class IgMessageConfigView(discord.ui.View):
         current_value = path.get("description", "")
         await interaction.response.send_modal(IgTextModal("Atur Deskripsi Embed", "Deskripsi Embed", current_value, self, self.type_key, "description", self.username))
 
-    @discord.ui.button(label="Atur Tombol & Warna", style=discord.ButtonStyle.secondary, row=1)
-    async def set_button_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(IgButtonLabelModal(self, self.type_key, self.username))
-
-    @discord.ui.button(label="Atur Warna Custom", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(label="Atur Warna Embed", style=discord.ButtonStyle.primary, row=1)
     async def set_custom_color_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(view=self.build_color_view())
 
-    @discord.ui.button(label="Toggle Status Embed", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="Toggle Status Embed", style=discord.ButtonStyle.secondary, row=1)
     async def toggle_embed_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
         current_state = config_msg.get('use_embed', True)
@@ -240,14 +187,14 @@ class IgMessageConfigView(discord.ui.View):
         self.cog.save_config()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
-    @discord.ui.button(label="Toggle Tracking", style=discord.ButtonStyle.danger, row=2)
+    @discord.ui.button(label="Toggle Tracking", style=discord.ButtonStyle.danger, row=1)
     async def toggle_tracking_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         toggles = self.cog.config["targets"][self.username].setdefault("toggles", {"post": True, "reel": True, "story": True})
         toggles[self.type_key] = not toggles.get(self.type_key, True)
         self.cog.save_config()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
-    @discord.ui.button(label="Selesai", style=discord.ButtonStyle.green, row=3)
+    @discord.ui.button(label="Selesai", style=discord.ButtonStyle.green, row=2)
     async def finish_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.delete()
         await interaction.response.send_message("Pengaturan IG Tracker berhasil disimpan!", ephemeral=True, delete_after=5)
@@ -333,9 +280,6 @@ class InstagramTracker(commands.Cog):
                 "title": "[📸 Postingan Baru]({url})",
                 "description": "Ada feed baru nih dari @{username}!\n\n{url}",
                 "content": "@everyone Update Feed IG!",
-                "button_label": "Lihat Postingan",
-                "button_style": discord.ButtonStyle.primary.value,
-                "button_color": "#E1306C",
                 "embed_color": "#E1306C",
                 "use_embed": True
             },
@@ -343,9 +287,6 @@ class InstagramTracker(commands.Cog):
                 "title": "[🎥 Reel Baru]({url})",
                 "description": "Ada Reel baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Reel IG!",
-                "button_label": "Tonton Reel",
-                "button_style": discord.ButtonStyle.primary.value,
-                "button_color": "#E1306C",
                 "embed_color": "#E1306C",
                 "use_embed": True
             },
@@ -353,9 +294,6 @@ class InstagramTracker(commands.Cog):
                 "title": "[⏱️ Story Baru]({url})",
                 "description": "Ada Story baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Story IG!",
-                "button_label": "Lihat Story",
-                "button_style": discord.ButtonStyle.danger.value,
-                "button_color": "#ed4245",
                 "embed_color": "#f1c40f",
                 "use_embed": True
             }
@@ -541,6 +479,84 @@ class InstagramTracker(commands.Cog):
             items = res_json
         return items
 
+    async def _fetch_and_process(self, session, url, headers, payload, username, data, content_type_target):
+        for attempt in range(3):
+            try:
+                async with session.post(url, headers=headers, json=payload) as resp:
+                    if resp.status == 200:
+                        res_json = await resp.json()
+                        items = self._parse_items(res_json)
+                        items.reverse()
+                        
+                        is_story = (content_type_target == "story")
+                        recent_key = "recent_stories" if is_story else "recent_posts"
+                        is_first_fetch = len(data[recent_key]) == 0
+                        new_count = 0
+
+                        for item in items:
+                            item_id = str(item.get("id", item.get("pk", "")))
+                            if not item_id or item_id in data[recent_key]:
+                                continue
+                            
+                            data[recent_key].append(item_id)
+                            if len(data[recent_key]) > 999:
+                                data[recent_key].pop(0)
+                            self.config["targets"][username] = data
+                            self.save_config()
+                            
+                            new_count += 1
+                            
+                            if is_first_fetch and item != items[-1]:
+                                continue
+
+                            code = item.get("code", item.get("shortcode", ""))
+                            if is_story:
+                                item_url = f"https://www.instagram.com/stories/{username}/{item_id}/"
+                            else:
+                                item_url = f"https://www.instagram.com/p/{code}/" if code else f"https://www.instagram.com/{username}/"
+                            
+                            direct_media_url = None
+                            is_video = item.get("is_video", False)
+                            
+                            if item.get("video_url"):
+                                direct_media_url = item.get("video_url")
+                                is_video = True
+                            elif "video_versions" in item and item["video_versions"]:
+                                direct_media_url = item["video_versions"][0].get("url")
+                                is_video = True
+                            elif item.get("display_url"):
+                                direct_media_url = item.get("display_url")
+                            elif "image_versions2" in item and item["image_versions2"].get("candidates"):
+                                direct_media_url = item["image_versions2"]["candidates"][0].get("url")
+                                
+                            if not direct_media_url and "edge_sidecar_to_children" in item:
+                                children = item["edge_sidecar_to_children"].get("edges", [])
+                                if children:
+                                    first_child = children[0].get("node", {})
+                                    if first_child.get("is_video") and first_child.get("video_url"):
+                                        direct_media_url = first_child.get("video_url")
+                                        is_video = True
+                                    elif first_child.get("display_url"):
+                                        direct_media_url = first_child.get("display_url")
+
+                            actual_content_type = "reel" if (is_video and not is_story) else content_type_target
+                            config_msg = data["custom_messages"].get(actual_content_type, self.default_messages[actual_content_type])
+                            
+                            await self._send_notification(username, data["channels"], item_url, direct_media_url, is_video, config_msg)
+                        
+                        if new_count > 0:
+                            logging.info(f"IG Tracker: Menemukan {new_count} {content_type_target} baru untuk @{username}.")
+                        return
+                    elif resp.status >= 500:
+                        logging.warning(f"IG Tracker: HTTP {resp.status} dari {url}. Mencoba ulang...")
+                        await asyncio.sleep(2)
+                    else:
+                        logging.error(f"IG Tracker: HTTP {resp.status} dari {url} untuk @{username}.")
+                        return
+            except Exception as e:
+                logging.error(f"IG Tracker: Exception pada {url} untuk @{username}: {e}")
+                await asyncio.sleep(2)
+
     @tasks.loop(minutes=20)
     async def monitor_task(self):
         if not self.api_key:
@@ -564,132 +580,20 @@ class InstagramTracker(commands.Cog):
                 if "recent_posts" not in data: data["recent_posts"] = []
                 if "recent_stories" not in data: data["recent_stories"] = []
 
-                if data.get("toggles", {}).get("post", True) or data.get("toggles", {}).get("reel", True):
-                    try:
-                        payload_posts = {"username": username, "maxId": ""}
-                        url_posts = "https://instagram120.p.rapidapi.com/api/instagram/posts"
-                        async with session.post(url_posts, headers=headers, json=payload_posts) as resp:
-                            if resp.status == 200:
-                                res_json = await resp.json()
-                                items = self._parse_items(res_json)
-                                items.reverse()
-                                
-                                is_first_fetch = len(data["recent_posts"]) == 0
-                                new_posts_count = 0
+                if data.get("toggles", {}).get("post", True):
+                    payload = {"username": username, "maxId": ""}
+                    url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
+                    await self._fetch_and_process(session, url, headers, payload, username, data, "post")
 
-                                for item in items:
-                                    post_id = str(item.get("id", item.get("pk", "")))
-                                    if not post_id or post_id in data["recent_posts"]:
-                                        continue
-                                    
-                                    data["recent_posts"].append(post_id)
-                                    if len(data["recent_posts"]) > 20:
-                                        data["recent_posts"].pop(0)
-                                    self.config["targets"][username] = data
-                                    self.save_config()
-                                    
-                                    new_posts_count += 1
-                                    
-                                    if is_first_fetch and item != items[-1]:
-                                        continue
-                                    
-                                    code = item.get("code", item.get("shortcode", ""))
-                                    post_url = f"https://www.instagram.com/p/{code}/" if code else f"https://www.instagram.com/{username}/"
-                                    
-                                    direct_media_url = None
-                                    is_video = item.get("is_video", False)
-                                    
-                                    if item.get("video_url"):
-                                        direct_media_url = item.get("video_url")
-                                        is_video = True
-                                    elif "video_versions" in item and item["video_versions"]:
-                                        direct_media_url = item["video_versions"][0].get("url")
-                                        is_video = True
-                                    elif item.get("display_url"):
-                                        direct_media_url = item.get("display_url")
-                                    elif "image_versions2" in item and item["image_versions2"].get("candidates"):
-                                        direct_media_url = item["image_versions2"]["candidates"][0].get("url")
-                                        
-                                    if not direct_media_url and "edge_sidecar_to_children" in item:
-                                        children = item["edge_sidecar_to_children"].get("edges", [])
-                                        if children:
-                                            first_child = children[0].get("node", {})
-                                            if first_child.get("is_video") and first_child.get("video_url"):
-                                                direct_media_url = first_child.get("video_url")
-                                                is_video = True
-                                            elif first_child.get("display_url"):
-                                                direct_media_url = first_child.get("display_url")
-
-                                    content_type = "reel" if is_video else "post"
-                                    is_tracked = data.get("toggles", {}).get(content_type, True)
-                                    
-                                    if is_tracked:
-                                        config_msg = data["custom_messages"].get(content_type, self.default_messages[content_type])
-                                        await self._send_notification(username, data["channels"], post_url, direct_media_url, is_video, config_msg)
-                                
-                                if new_posts_count > 0:
-                                    logging.info(f"IG Tracker: Menemukan {new_posts_count} posts/reels baru untuk @{username}.")
-                            else:
-                                logging.error(f"IG Tracker Posts HTTP Error {resp.status} untuk @{username}.")
-                    except Exception as e:
-                        logging.error(f"IG Tracker Exception pada Posts @{username}: {e}")
+                if data.get("toggles", {}).get("reel", True):
+                    payload = {"username": username, "maxId": ""}
+                    url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
+                    await self._fetch_and_process(session, url, headers, payload, username, data, "reel")
 
                 if data.get("toggles", {}).get("story", True):
-                    try:
-                        payload_stories = {"username": username}
-                        url_stories = "https://instagram120.p.rapidapi.com/api/instagram/stories"
-                        async with session.post(url_stories, headers=headers, json=payload_stories) as resp_st:
-                            if resp_st.status == 200:
-                                res_json_st = await resp_st.json()
-                                items_st = self._parse_items(res_json_st)
-                                items_st.reverse()
-                                
-                                is_first_fetch_st = len(data["recent_stories"]) == 0
-                                new_story_count = 0
-
-                                for item in items_st:
-                                    story_id = str(item.get("id", item.get("pk", "")))
-                                    if not story_id or story_id in data["recent_stories"]:
-                                        continue
-                                    
-                                    data["recent_stories"].append(story_id)
-                                    if len(data["recent_stories"]) > 20:
-                                        data["recent_stories"].pop(0)
-                                    self.config["targets"][username] = data
-                                    self.save_config()
-                                    
-                                    new_story_count += 1
-                                    
-                                    if is_first_fetch_st and item != items_st[-1]:
-                                        continue
-
-                                    story_url = f"https://www.instagram.com/stories/{username}/{story_id}/"
-                                    
-                                    direct_media_url_st = None
-                                    is_video_st = item.get("is_video", False)
-                                    
-                                    if item.get("video_url"):
-                                        direct_media_url_st = item.get("video_url")
-                                        is_video_st = True
-                                    elif "video_versions" in item and item["video_versions"]:
-                                        direct_media_url_st = item["video_versions"][0].get("url")
-                                        is_video_st = True
-                                    elif item.get("display_url"):
-                                        direct_media_url_st = item.get("display_url")
-                                    elif "image_versions2" in item and item["image_versions2"].get("candidates"):
-                                        direct_media_url_st = item["image_versions2"]["candidates"][0].get("url")
-
-                                    is_tracked_st = data.get("toggles", {}).get("story", True)
-                                    if is_tracked_st:
-                                        config_msg_st = data["custom_messages"].get("story", self.default_messages["story"])
-                                        await self._send_notification(username, data["channels"], story_url, direct_media_url_st, is_video_st, config_msg_st)
-                                
-                                if new_story_count > 0:
-                                    logging.info(f"IG Tracker: Menemukan {new_story_count} story baru untuk @{username}.")
-                            else:
-                                logging.error(f"IG Tracker Stories HTTP Error {resp_st.status} untuk @{username}.")
-                    except Exception as e:
-                        logging.error(f"IG Tracker Exception pada Stories @{username}: {e}")
+                    payload = {"username": username}
+                    url = "https://instagram120.p.rapidapi.com/api/instagram/stories"
+                    await self._fetch_and_process(session, url, headers, payload, username, data, "story")
                 
                 await asyncio.sleep(5)
 
@@ -729,22 +633,11 @@ class InstagramTracker(commands.Cog):
             else:
                 msg_content = f"👇 **[Putar Video Langsung]({direct_media_url})**"
 
-        button_label = config_msg.get('button_label', 'Buka Instagram')
-        button_style_value = config_msg.get('button_style', discord.ButtonStyle.primary.value)
-        try:
-            button_style = discord.ButtonStyle(button_style_value)
-        except ValueError:
-            button_style = discord.ButtonStyle.primary
-
-        view = discord.ui.View()
-        button = discord.ui.Button(label=button_label, style=button_style, url=url)
-        view.add_item(button)
-
         for channel_id in channels:
             target_ch = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
             if target_ch:
                 try:
-                    await target_ch.send(content=msg_content, embed=embed_obj, view=view)
+                    await target_ch.send(content=msg_content, embed=embed_obj)
                 except Exception:
                     pass
 
