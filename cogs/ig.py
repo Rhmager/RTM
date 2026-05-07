@@ -494,8 +494,13 @@ class InstagramTracker(commands.Cog):
                         new_count = 0
 
                         for item in items:
-                            item_id = str(item.get("id", item.get("pk", "")))
-                            if not item_id or item_id in data[recent_key]:
+                            raw_id = str(item.get("pk", item.get("id", "")))
+                            if not raw_id:
+                                continue
+                                
+                            item_id = raw_id.split("_")[0] if "_" in raw_id else raw_id
+                            
+                            if item_id in data[recent_key]:
                                 continue
                             
                             data[recent_key].append(item_id)
@@ -549,13 +554,13 @@ class InstagramTracker(commands.Cog):
                         return
                     elif resp.status >= 500:
                         logging.warning(f"IG Tracker: HTTP {resp.status} dari {url}. Mencoba ulang...")
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(5)
                     else:
                         logging.error(f"IG Tracker: HTTP {resp.status} dari {url} untuk @{username}.")
                         return
             except Exception as e:
                 logging.error(f"IG Tracker: Exception pada {url} untuk @{username}: {e}")
-                await asyncio.sleep(2)
+                await asyncio.sleep(5)
 
     @tasks.loop(minutes=20)
     async def monitor_task(self):
@@ -629,9 +634,9 @@ class InstagramTracker(commands.Cog):
 
         if is_video and direct_media_url:
             if msg_content:
-                msg_content += f"\n👇 **[Putar Video Langsung]({direct_media_url})**"
+                msg_content += f"\n👇 [Putar Video Langsung]({direct_media_url})"
             else:
-                msg_content = f"👇 **[Putar Video Langsung]({direct_media_url})**"
+                msg_content = f"👇 [Putar Video Langsung]({direct_media_url})"
 
         for channel_id in channels:
             target_ch = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
