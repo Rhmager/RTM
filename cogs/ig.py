@@ -181,7 +181,7 @@ class IgMessageConfigView(discord.ui.View):
     async def set_custom_color_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(view=self.build_color_view())
 
-    @discord.ui.button(label="Toggle Status Embed", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Toggle Embed", style=discord.ButtonStyle.secondary, row=1)
     async def toggle_embed_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
         current_state = config_msg.get('use_embed', True)
@@ -482,7 +482,9 @@ class InstagramTracker(commands.Cog):
         items = []
         if "result" in res_json:
             if isinstance(res_json["result"], dict) and "edges" in res_json["result"]:
-                items = [edge.get("node", {}) for edge in res_json["result"]["edges"]]
+                for edge in res_json["result"]["edges"]:
+                    node = edge.get("node", {})
+                    items.append(node.get("media", node))
             elif isinstance(res_json["result"], list):
                 items = res_json["result"]
         elif "data" in res_json:
@@ -555,17 +557,16 @@ class InstagramTracker(commands.Cog):
                             direct_media_url = None
                             is_video = item.get("is_video", False)
                             
-                            if item.get("video_url"):
-                                direct_media_url = item.get("video_url")
-                                is_video = True
-                            elif "video_versions" in item and item["video_versions"]:
-                                direct_media_url = item["video_versions"][0].get("url")
-                                is_video = True
-                            elif item.get("display_url"):
-                                direct_media_url = item.get("display_url")
-                            elif "image_versions2" in item and item["image_versions2"].get("candidates"):
-                                direct_media_url = item["image_versions2"]["candidates"][0].get("url")
-                                
+                            if not direct_media_url and "carousel_media" in item:
+                                children = item["carousel_media"]
+                                if children:
+                                    first_child = children[0]
+                                    if first_child.get("video_versions"):
+                                        direct_media_url = first_child["video_versions"][0].get("url")
+                                        is_video = True
+                                    elif first_child.get("image_versions2") and first_child["image_versions2"].get("candidates"):
+                                        direct_media_url = first_child["image_versions2"]["candidates"][0].get("url")
+
                             if not direct_media_url and "edge_sidecar_to_children" in item:
                                 children = item["edge_sidecar_to_children"].get("edges", [])
                                 if children:
@@ -577,6 +578,18 @@ class InstagramTracker(commands.Cog):
                                             break
                                         elif child.get("display_url") and not direct_media_url:
                                             direct_media_url = child.get("display_url")
+                            
+                            if not direct_media_url:
+                                if item.get("video_url"):
+                                    direct_media_url = item.get("video_url")
+                                    is_video = True
+                                elif "video_versions" in item and item["video_versions"]:
+                                    direct_media_url = item["video_versions"][0].get("url")
+                                    is_video = True
+                                elif item.get("display_url"):
+                                    direct_media_url = item.get("display_url")
+                                elif "image_versions2" in item and item["image_versions2"].get("candidates"):
+                                    direct_media_url = item["image_versions2"]["candidates"][0].get("url")
 
                             actual_content_type = "reel" if (is_video and not is_story) else content_type_target
                             config_msg = data["custom_messages"].get(actual_content_type, self.default_messages[actual_content_type])
