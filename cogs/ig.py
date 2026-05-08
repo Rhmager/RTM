@@ -592,9 +592,11 @@ class InstagramTracker(commands.Cog):
                                     direct_media_url = item["image_versions2"]["candidates"][0].get("url")
 
                             actual_content_type = "reel" if (is_video and not is_story) else content_type_target
-                            config_msg = data["custom_messages"].get(actual_content_type, self.default_messages[actual_content_type])
                             
-                            await self._send_notification(username, data["channels"], item_url, direct_media_url, is_video, config_msg)
+                            is_tracked = data.get("toggles", {}).get(actual_content_type, True)
+                            if is_tracked:
+                                config_msg = data["custom_messages"].get(actual_content_type, self.default_messages[actual_content_type])
+                                await self._send_notification(username, data["channels"], item_url, direct_media_url, is_video, config_msg)
                         
                         if new_count > 0:
                             logging.info(f"IG Tracker: Menemukan {new_count} {content_type_target} baru untuk @{username}.")
@@ -632,15 +634,13 @@ class InstagramTracker(commands.Cog):
                 if "recent_posts" not in data: data["recent_posts"] = []
                 if "recent_stories" not in data: data["recent_stories"] = []
 
-                if data.get("toggles", {}).get("post", True):
+                track_post = data.get("toggles", {}).get("post", True)
+                track_reel = data.get("toggles", {}).get("reel", True)
+                
+                if track_post or track_reel:
                     payload = {"username": username, "maxId": ""}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "post")
-
-                if data.get("toggles", {}).get("reel", True):
-                    payload = {"username": username, "maxId": ""}
-                    url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
-                    await self._fetch_and_process(session, url, headers, payload, username, data, "reel")
 
                 if data.get("toggles", {}).get("story", True):
                     payload = {"username": username}
