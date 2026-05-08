@@ -30,7 +30,7 @@ class IgTextModal(discord.ui.Modal):
         self.parent_view.cog.save_config()
         await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
 
-class IgButtonLabelModal(discord.ui.Modal, title="Atur Tombol Notifikasi"):
+class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
     def __init__(self, parent_view, type_key, username):
         super().__init__()
         self.parent_view = parent_view
@@ -39,35 +39,10 @@ class IgButtonLabelModal(discord.ui.Modal, title="Atur Tombol Notifikasi"):
         
         target_data = parent_view.cog.config["targets"].get(username)
         path = target_data["custom_messages"][type_key] if target_data else {}
-        current_label = path.get("button_label", "")
-        
-        self.label_input = discord.ui.TextInput(
-            label="Label Tombol",
-            default=current_label,
-            style=discord.TextStyle.short,
-            max_length=80
-        )
-        self.add_item(self.label_input)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["button_label"] = self.label_input.value
-        self.parent_view.cog.save_config()
-        await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view.build_color_view())
-
-class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
-    def __init__(self, parent_view, type_key, username, color_type):
-        super().__init__()
-        self.parent_view = parent_view
-        self.type_key = type_key
-        self.username = username
-        self.color_type = color_type
-        
-        target_data = parent_view.cog.config["targets"].get(username)
-        path = target_data["custom_messages"][type_key] if target_data else {}
-        current_color = path.get("embed_color" if color_type == 'embed' else "button_color", "")
+        current_color = path.get("embed_color", "")
         
         self.color_input = discord.ui.TextInput(
-            label=f"Warna HEX {color_type.capitalize()}",
+            label="Warna HEX Embed",
             default=current_color or "#E1306C",
             style=discord.TextStyle.short,
             max_length=7,
@@ -79,14 +54,11 @@ class IgColorInputModal(discord.ui.Modal, title="Atur Warna Custom"):
         color_value = self.color_input.value.strip()
         if not re.match(r'^#[0-9A-Fa-f]{6}$', color_value):
             return await interaction.response.send_message("Format warna HEX tidak valid! Gunakan format: #RRGGBB", ephemeral=True)
-        if self.color_type == 'embed':
-            self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["embed_color"] = color_value
-        else:
-            self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["button_color"] = color_value
+        self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]["embed_color"] = color_value
         self.parent_view.cog.save_config()
         await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view.build_color_view())
 
-class IgButtonColorView(discord.ui.View):
+class IgEmbedColorView(discord.ui.View):
     def __init__(self, parent_view, type_key, username):
         super().__init__(timeout=180)
         self.parent_view = parent_view
@@ -95,12 +67,6 @@ class IgButtonColorView(discord.ui.View):
         self._create_buttons()
 
     def _create_buttons(self):
-        preset_colors = [
-            ("Biru Primary", discord.ButtonStyle.primary, "#5865f2"),
-            ("Abu Secondary", discord.ButtonStyle.secondary, "#95a5a6"),
-            ("Hijau Success", discord.ButtonStyle.success, "#57f287"),
-            ("Merah Danger", discord.ButtonStyle.danger, "#ed4245")
-        ]
         embed_colors = [
             ("Merah Live", "#e74c3c"),
             ("Hijau Upload", "#2ecc71"),
@@ -111,21 +77,11 @@ class IgButtonColorView(discord.ui.View):
             ("Pink IG", "#E1306C"),
             ("Navy", "#34495e")
         ]
-        self.add_item(discord.ui.Button(label="WARNA TOMBOL", style=discord.ButtonStyle.grey, disabled=True, row=0))
-        for label, style, hex_color in preset_colors:
-            button = discord.ui.Button(label=label, style=style, row=1)
-            async def callback(interaction: discord.Interaction, btn_style_value, btn_hex):
-                config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
-                config_msg["button_style"] = btn_style_value
-                config_msg["button_color"] = btn_hex
-                self.parent_view.cog.save_config()
-                await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
-                self.stop()
-            button.callback = partial(callback, btn_style_value=style.value, btn_hex=hex_color)
-            self.add_item(button)
-        self.add_item(discord.ui.Button(label="WARNA EMBED", style=discord.ButtonStyle.grey, disabled=True, row=2))
+        
+        self.add_item(discord.ui.Button(label="WARNA EMBED", style=discord.ButtonStyle.grey, disabled=True, row=0))
+        
         for label, hex_color in embed_colors[:4]:
-            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=3)
+            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=1)
             async def callback(interaction: discord.Interaction, embed_hex):
                 config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
                 config_msg["embed_color"] = embed_hex
@@ -134,8 +90,9 @@ class IgButtonColorView(discord.ui.View):
                 self.stop()
             button.callback = partial(callback, embed_hex=hex_color)
             self.add_item(button)
+            
         for label, hex_color in embed_colors[4:]:
-            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=4)
+            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=2)
             async def callback(interaction: discord.Interaction, embed_hex=hex_color):
                 config_msg = self.parent_view.cog.config["targets"][self.username]["custom_messages"][self.type_key]
                 config_msg["embed_color"] = embed_hex
@@ -144,12 +101,14 @@ class IgButtonColorView(discord.ui.View):
                 self.stop()
             button.callback = partial(callback, embed_hex=hex_color)
             self.add_item(button)
-        custom_embed_btn = discord.ui.Button(label="Custom Warna Embed", style=discord.ButtonStyle.secondary, row=0)
+            
+        custom_embed_btn = discord.ui.Button(label="Custom Warna Embed", style=discord.ButtonStyle.secondary, row=3)
         async def custom_embed_callback(interaction: discord.Interaction):
-            await interaction.response.send_modal(IgColorInputModal(self.parent_view, self.type_key, self.username, 'embed'))
+            await interaction.response.send_modal(IgColorInputModal(self.parent_view, self.type_key, self.username))
         custom_embed_btn.callback = custom_embed_callback
         self.add_item(custom_embed_btn)
-        cancel_button = discord.ui.Button(label="Batalkan", style=discord.ButtonStyle.red, row=4)
+        
+        cancel_button = discord.ui.Button(label="Batalkan", style=discord.ButtonStyle.red, row=3)
         async def cancel_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
             self.stop()
@@ -167,13 +126,14 @@ class IgMessageConfigView(discord.ui.View):
         target_data = self.cog.config["targets"][self.username]
         config_msg = target_data["custom_messages"][self.type_key]
         embed_color_hex = config_msg.get('embed_color', '#E1306C')
-        button_color_hex = config_msg.get('button_color', '#5865f2')
+        
         try:
             color_int = int(embed_color_hex.strip("#"), 16)
             embed_color = discord.Color(color_int)
         except:
             embed_color = discord.Color.blue()
             embed_color_hex = "#E1306C"
+            
         embed = discord.Embed(
             title=f"Pengaturan IG: {self.type_key.upper()}",
             description=f"**Akun Target:** `@{self.username}`",
@@ -183,53 +143,57 @@ class IgMessageConfigView(discord.ui.View):
         embed.add_field(name="Judul Embed", value=f"`{config_msg.get('title') or 'Belum diatur'}`", inline=False)
         embed.add_field(name="Deskripsi Embed", value=f"`{config_msg.get('description') or 'Belum diatur'}`", inline=False)
         
-        button_style_value = config_msg.get('button_style', discord.ButtonStyle.primary.value)
-        try:
-            button_style_name = discord.ButtonStyle(button_style_value).name.capitalize().replace('_', ' ')
-        except ValueError:
-            button_style_name = "Primary"
-            
         use_embed = config_msg.get('use_embed', True)
         is_tracking = target_data.get("toggles", {}).get(self.type_key, True)
+        show_ig_link = config_msg.get('show_ig_link', True)
 
         embed.add_field(name="Warna Samping Embed", value=f"`{embed_color_hex}`", inline=True)
         embed.add_field(name="Status Embed", value=f"**`{'Aktif' if use_embed else 'Mati'}`**", inline=True)
+        embed.add_field(name="Tampil Link IG Asli", value=f"**`{'Ya' if show_ig_link else 'Tidak'}`**", inline=True)
         embed.add_field(name="Status Tracking", value=f"**`{'Nyala' if is_tracking else 'Mati'}`**", inline=True)
         return embed
 
     def build_color_view(self):
-        return IgButtonColorView(self, self.type_key, self.username)
+        return IgEmbedColorView(self, self.type_key, self.username)
 
-    @discord.ui.button(label="Atur Pesan Biasa", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Atur Pesan", style=discord.ButtonStyle.secondary, row=0)
     async def set_content_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         target_data = self.cog.config["targets"].get(self.username)
         path = target_data["custom_messages"][self.type_key] if target_data else {}
         current_value = path.get("content", "")
         await interaction.response.send_modal(IgTextModal("Atur Pesan Biasa", "Isi Pesan", current_value, self, self.type_key, "content", self.username))
 
-    @discord.ui.button(label="Atur Judul Embed", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Atur Judul", style=discord.ButtonStyle.secondary, row=0)
     async def set_title_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         target_data = self.cog.config["targets"].get(self.username)
         path = target_data["custom_messages"][self.type_key] if target_data else {}
         current_value = path.get("title", "")
         await interaction.response.send_modal(IgTextModal("Atur Judul Embed", "Judul Embed", current_value, self, self.type_key, "title", self.username))
 
-    @discord.ui.button(label="Atur Deskripsi Embed", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Atur Deskripsi", style=discord.ButtonStyle.secondary, row=0)
     async def set_desc_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         target_data = self.cog.config["targets"].get(self.username)
         path = target_data["custom_messages"][self.type_key] if target_data else {}
         current_value = path.get("description", "")
         await interaction.response.send_modal(IgTextModal("Atur Deskripsi Embed", "Deskripsi Embed", current_value, self, self.type_key, "description", self.username))
 
-    @discord.ui.button(label="Atur Warna Embed", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(label="Warna Embed", style=discord.ButtonStyle.primary, row=1)
     async def set_custom_color_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(view=self.build_color_view())
 
-    @discord.ui.button(label="Toggle Status Embed", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Toggle Embed", style=discord.ButtonStyle.secondary, row=1)
     async def toggle_embed_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
         current_state = config_msg.get('use_embed', True)
         config_msg['use_embed'] = not current_state
+        self.cog.save_config()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Toggle Link IG", style=discord.ButtonStyle.secondary, row=1)
+    async def toggle_ig_link_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
+        current_state = config_msg.get('show_ig_link', True)
+        config_msg['show_ig_link'] = not current_state
         self.cog.save_config()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
@@ -327,21 +291,24 @@ class InstagramTracker(commands.Cog):
                 "description": "Ada feed baru nih dari @{username}!\n\n{url}",
                 "content": "@everyone Update Feed IG!",
                 "embed_color": "#E1306C",
-                "use_embed": True
+                "use_embed": True,
+                "show_ig_link": True
             },
             "reel": {
                 "title": "[🎥 Reel Baru]({url})",
                 "description": "Ada Reel baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Reel IG!",
                 "embed_color": "#E1306C",
-                "use_embed": True
+                "use_embed": True,
+                "show_ig_link": True
             },
             "story": {
                 "title": "[⏱️ Story Baru]({url})",
                 "description": "Ada Story baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Story IG!",
                 "embed_color": "#f1c40f",
-                "use_embed": True
+                "use_embed": True,
+                "show_ig_link": True
             }
         }
         
@@ -391,6 +358,8 @@ class InstagramTracker(commands.Cog):
             for msg_type, default_msg in self.default_messages.items():
                 if msg_type not in target_data["custom_messages"]:
                     target_data["custom_messages"][msg_type] = default_msg.copy()
+                if "show_ig_link" not in target_data["custom_messages"][msg_type]:
+                    target_data["custom_messages"][msg_type]["show_ig_link"] = True
         
         self.save_local()
 
@@ -525,6 +494,21 @@ class InstagramTracker(commands.Cog):
             items = res_json
         return items
 
+    def _get_timestamp(self, item):
+        ts = item.get("taken_at") or item.get("taken_at_timestamp") or item.get("device_timestamp")
+        if ts:
+            try: return int(ts)
+            except: pass
+            
+        caption = item.get("caption")
+        if isinstance(caption, dict):
+            c_ts = caption.get("created_at")
+            if c_ts:
+                try: return int(c_ts)
+                except: pass
+                
+        return 0
+
     async def _fetch_and_process(self, session, url, headers, payload, username, data, content_type_target):
         for attempt in range(3):
             try:
@@ -533,7 +517,8 @@ class InstagramTracker(commands.Cog):
                         res_json = await resp.json()
                         items = self._parse_items(res_json)
                         
-                        items.sort(key=lambda x: int(x.get("taken_at", 0)))
+                        items.reverse()
+                        items.sort(key=self._get_timestamp)
                         
                         is_story = (content_type_target == "story")
                         recent_key = "recent_stories" if is_story else "recent_posts"
@@ -584,12 +569,14 @@ class InstagramTracker(commands.Cog):
                             if not direct_media_url and "edge_sidecar_to_children" in item:
                                 children = item["edge_sidecar_to_children"].get("edges", [])
                                 if children:
-                                    first_child = children[0].get("node", {})
-                                    if first_child.get("is_video") and first_child.get("video_url"):
-                                        direct_media_url = first_child.get("video_url")
-                                        is_video = True
-                                    elif first_child.get("display_url"):
-                                        direct_media_url = first_child.get("display_url")
+                                    for child_edge in children:
+                                        child = child_edge.get("node", {})
+                                        if child.get("is_video") and child.get("video_url"):
+                                            direct_media_url = child.get("video_url")
+                                            is_video = True
+                                            break
+                                        elif child.get("display_url") and not direct_media_url:
+                                            direct_media_url = child.get("display_url")
 
                             actual_content_type = "reel" if (is_video and not is_story) else content_type_target
                             config_msg = data["custom_messages"].get(actual_content_type, self.default_messages[actual_content_type])
@@ -654,13 +641,19 @@ class InstagramTracker(commands.Cog):
         embed_title = config_msg.get('title', '')
         embed_desc = config_msg.get('description', '')
         use_embed = config_msg.get('use_embed', True)
+        show_ig_link = config_msg.get('show_ig_link', True)
+
+        ig_url_text = url if show_ig_link else ""
 
         if msg_content:
-            msg_content = msg_content.replace("{username}", username).replace("{url}", url)
+            msg_content = msg_content.replace("{username}", username).replace("{url}", ig_url_text)
         if embed_title:
-            embed_title = embed_title.replace("{username}", username).replace("{url}", url)
+            embed_title = embed_title.replace("{username}", username).replace("{url}", ig_url_text)
         if embed_desc:
-            embed_desc = embed_desc.replace("{username}", username).replace("{url}", url)
+            embed_desc = embed_desc.replace("{username}", username).replace("{url}", ig_url_text)
+
+        if not show_ig_link:
+            embed_title = re.sub(r'\[(.*?)\]\(\s*\)', r'\1', embed_title).strip()
 
         embed_obj = None
         if use_embed:
@@ -674,16 +667,17 @@ class InstagramTracker(commands.Cog):
             if direct_media_url and not is_video:
                 embed_obj.set_image(url=direct_media_url)
         else:
-            if msg_content:
+            if not msg_content:
+                msg_content = url if show_ig_link else ""
+            elif show_ig_link and "{url}" not in config_msg.get('content', ''):
                 msg_content += f"\n{url}"
-            else:
-                msg_content = url
 
-        if is_video and direct_media_url:
+        if direct_media_url:
+            direct_text = f"\n👇 [Putar Video Langsung]({direct_media_url})" if is_video else f"\n👇 [Lihat Foto Langsung]({direct_media_url})"
             if msg_content:
-                msg_content += f"\n👇 [Putar Video Langsung]({direct_media_url})"
+                msg_content += direct_text
             else:
-                msg_content = f"👇 [Putar Video Langsung]({direct_media_url})"
+                msg_content = direct_text.strip()
 
         for channel_id in channels:
             target_ch = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
