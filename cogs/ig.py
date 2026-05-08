@@ -181,7 +181,7 @@ class IgMessageConfigView(discord.ui.View):
     async def set_custom_color_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(view=self.build_color_view())
 
-    @discord.ui.button(label="Toggle Embed", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Toggle Status Embed", style=discord.ButtonStyle.secondary, row=1)
     async def toggle_embed_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
         current_state = config_msg.get('use_embed', True)
@@ -230,7 +230,7 @@ class IgTypeSelectView(discord.ui.View):
             self.stop()
         type_select.callback = callback
         self.add_item(type_select)
-        back_button = discord.ui.Button(label="← Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
+        back_button = discord.ui.Button(label="Ganti Akun", style=discord.ButtonStyle.secondary, row=1)
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(content="Pilih Akun Instagram yang akan dikonfigurasi:", embed=None, view=IgTargetSelectView(self.cog))
             self.stop()
@@ -287,7 +287,7 @@ class InstagramTracker(commands.Cog):
         
         self.default_messages = {
             "post": {
-                "title": "[📸 Postingan Baru]({url})",
+                "title": "[Postingan Baru]({url})",
                 "description": "Ada feed baru nih dari @{username}!\n\n{url}",
                 "content": "@everyone Update Feed IG!",
                 "embed_color": "#E1306C",
@@ -295,7 +295,7 @@ class InstagramTracker(commands.Cog):
                 "show_ig_link": True
             },
             "reel": {
-                "title": "[🎥 Reel Baru]({url})",
+                "title": "[Reel Baru]({url})",
                 "description": "Ada Reel baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Reel IG!",
                 "embed_color": "#E1306C",
@@ -303,7 +303,7 @@ class InstagramTracker(commands.Cog):
                 "show_ig_link": True
             },
             "story": {
-                "title": "[⏱️ Story Baru]({url})",
+                "title": "[Story Baru]({url})",
                 "description": "Ada Story baru dari @{username}!\n\n{url}",
                 "content": "@everyone Update Story IG!",
                 "embed_color": "#f1c40f",
