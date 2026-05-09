@@ -578,8 +578,6 @@ class InstagramTracker(commands.Cog):
                                 data[recent_key].pop(0)
                             self.config["targets"][username] = data
                             self.save_config()
-                            
-                            new_count += 1
 
                             code = item.get("code", item.get("shortcode", ""))
                             if is_story:
@@ -628,6 +626,10 @@ class InstagramTracker(commands.Cog):
                                 elif "image_versions2" in item and item["image_versions2"].get("candidates"):
                                     direct_media_url = item["image_versions2"]["candidates"][0].get("url")
 
+                            if content_type_target == "reel" and (not is_video or not direct_media_url or ".mp4" not in direct_media_url.lower()):
+                                continue
+
+                            new_count += 1
                             actual_content_type = "reel" if (is_video and not is_story) else content_type_target
                             
                             is_tracked = data.get("toggles", {}).get(actual_content_type, True)
