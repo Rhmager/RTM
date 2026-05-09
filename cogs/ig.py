@@ -145,7 +145,7 @@ class IgMessageConfigView(discord.ui.View):
         
         use_embed = config_msg.get('use_embed', True)
         is_tracking = target_data.get("toggles", {}).get(self.type_key, True)
-        show_ig_link = config_msg.get('show_ig_link', True)
+        show_ig_link = config_msg.get('show_ig_link', False)
 
         embed.add_field(name="Warna Samping Embed", value=f"`{embed_color_hex}`", inline=True)
         embed.add_field(name="Status Embed", value=f"**`{'Aktif' if use_embed else 'Mati'}`**", inline=True)
@@ -192,7 +192,7 @@ class IgMessageConfigView(discord.ui.View):
     @discord.ui.button(label="Toggle Link IG", style=discord.ButtonStyle.secondary, row=1)
     async def toggle_ig_link_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         config_msg = self.cog.config["targets"][self.username]["custom_messages"][self.type_key]
-        current_state = config_msg.get('show_ig_link', True)
+        current_state = config_msg.get('show_ig_link', False)
         config_msg['show_ig_link'] = not current_state
         self.cog.save_config()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
@@ -292,7 +292,7 @@ class InstagramTracker(commands.Cog):
                 "content": "@everyone Update Feed IG!",
                 "embed_color": "#E1306C",
                 "use_embed": True,
-                "show_ig_link": True
+                "show_ig_link": False
             },
             "reel": {
                 "title": "[Reel Baru]({url})",
@@ -300,7 +300,7 @@ class InstagramTracker(commands.Cog):
                 "content": "@everyone Update Reel IG!",
                 "embed_color": "#E1306C",
                 "use_embed": True,
-                "show_ig_link": True
+                "show_ig_link": False
             },
             "story": {
                 "title": "[Story Baru]({url})",
@@ -308,7 +308,7 @@ class InstagramTracker(commands.Cog):
                 "content": "@everyone Update Story IG!",
                 "embed_color": "#f1c40f",
                 "use_embed": True,
-                "show_ig_link": True
+                "show_ig_link": False
             }
         }
         
@@ -359,7 +359,7 @@ class InstagramTracker(commands.Cog):
                 if msg_type not in target_data["custom_messages"]:
                     target_data["custom_messages"][msg_type] = default_msg.copy()
                 if "show_ig_link" not in target_data["custom_messages"][msg_type]:
-                    target_data["custom_messages"][msg_type]["show_ig_link"] = True
+                    target_data["custom_messages"][msg_type]["show_ig_link"] = False
         
         self.save_local()
 
@@ -480,20 +480,46 @@ class InstagramTracker(commands.Cog):
 
     def _parse_items(self, res_json):
         items = []
-        if "result" in res_json:
-            if isinstance(res_json["result"], dict) and "edges" in res_json["result"]:
-                for edge in res_json["result"]["edges"]:
-                    node = edge.get("node", {})
-                    items.append(node.get("media", node))
-            elif isinstance(res_json["result"], list):
-                items = res_json["result"]
-        elif "data" in res_json:
-            if isinstance(res_json["data"], list):
-                items = res_json["data"]
-            elif isinstance(res_json["data"], dict) and "items" in res_json["data"]:
-                items = res_json["data"]["items"]
-        elif isinstance(res_json, list):
-            items = res_json
+        try:
+            if "result" in res_json:
+                res = res_json["result"]
+                if isinstance(res, dict):
+                    if "edges" in res:
+                        for edge in res["edges"]:
+                            node = edge.get("node", {})
+                            if "media" in node:
+                                items.append(node["media"])
+                            else:
+                                items.append(node)
+                    elif "items" in res:
+                        items = res["items"]
+                    elif "data" in res and isinstance(res["data"], list):
+                        items = res["data"]
+                elif isinstance(res, list):
+                    items = res
+            elif "data" in res_json:
+                data = res_json["data"]
+                if isinstance(data, list):
+                    items = data
+                elif isinstance(data, dict):
+                    if "items" in data:
+                        items = data["items"]
+                    elif "user" in data:
+                        user_data = data["user"]
+                        if "edge_owner_to_timeline_media" in user_data:
+                            edges = user_data["edge_owner_to_timeline_media"].get("edges", [])
+                            for edge in edges:
+                                node = edge.get("node", {})
+                                if "media" in node:
+                                    items.append(node["media"])
+                                else:
+                                    items.append(node)
+            elif "items" in res_json:
+                items = res_json["items"]
+            elif isinstance(res_json, list):
+                items = res_json
+        except Exception:
+            pass
         return items
 
     def _get_timestamp(self, item):
@@ -519,7 +545,11 @@ class InstagramTracker(commands.Cog):
                         res_json = await resp.json()
                         items = self._parse_items(res_json)
                         
-                        items.reverse()
+                        logging.info(f"IG Tracker: Endpoint {url.split('/')[-1]} mengembalikan {len(items)} data untuk @{username}")
+                        
+                        if not items:
+                            return
+
                         items.sort(key=self._get_timestamp)
                         
                         is_story = (content_type_target == "story")
@@ -537,6 +567,12 @@ class InstagramTracker(commands.Cog):
                             if item_id in data[recent_key]:
                                 continue
                             
+                            if is_first_fetch and item != items[-1]:
+                                data[recent_key].append(item_id)
+                                if len(data[recent_key]) > 999:
+                                    data[recent_key].pop(0)
+                                continue
+
                             data[recent_key].append(item_id)
                             if len(data[recent_key]) > 999:
                                 data[recent_key].pop(0)
@@ -544,9 +580,6 @@ class InstagramTracker(commands.Cog):
                             self.save_config()
                             
                             new_count += 1
-                            
-                            if is_first_fetch and item != items[-1]:
-                                continue
 
                             code = item.get("code", item.get("shortcode", ""))
                             if is_story:
@@ -576,6 +609,10 @@ class InstagramTracker(commands.Cog):
                                             direct_media_url = child.get("video_url")
                                             is_video = True
                                             break
+                                        elif child.get("is_video") and child.get("video_versions"):
+                                            direct_media_url = child["video_versions"][0].get("url")
+                                            is_video = True
+                                            break
                                         elif child.get("display_url") and not direct_media_url:
                                             direct_media_url = child.get("display_url")
                             
@@ -599,7 +636,7 @@ class InstagramTracker(commands.Cog):
                                 await self._send_notification(username, data["channels"], item_url, direct_media_url, is_video, config_msg)
                         
                         if new_count > 0:
-                            logging.info(f"IG Tracker: Menemukan {new_count} {content_type_target} baru untuk @{username}.")
+                            logging.info(f"IG Tracker: Notifikasi dikirim. Menemukan {new_count} {content_type_target} baru untuk @{username}.")
                         return
                     elif resp.status >= 500:
                         logging.warning(f"IG Tracker: HTTP {resp.status} dari {url}. Mencoba ulang...")
@@ -634,13 +671,15 @@ class InstagramTracker(commands.Cog):
                 if "recent_posts" not in data: data["recent_posts"] = []
                 if "recent_stories" not in data: data["recent_stories"] = []
 
-                track_post = data.get("toggles", {}).get("post", True)
-                track_reel = data.get("toggles", {}).get("reel", True)
-                
-                if track_post or track_reel:
+                if data.get("toggles", {}).get("post", True):
                     payload = {"username": username, "maxId": ""}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "post")
+
+                if data.get("toggles", {}).get("reel", True):
+                    payload = {"username": username, "maxId": ""}
+                    url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
+                    await self._fetch_and_process(session, url, headers, payload, username, data, "reel")
 
                 if data.get("toggles", {}).get("story", True):
                     payload = {"username": username}
@@ -654,7 +693,7 @@ class InstagramTracker(commands.Cog):
         embed_title = config_msg.get('title', '')
         embed_desc = config_msg.get('description', '')
         use_embed = config_msg.get('use_embed', True)
-        show_ig_link = config_msg.get('show_ig_link', True)
+        show_ig_link = config_msg.get('show_ig_link', False)
 
         ig_url_text = url if show_ig_link else ""
 
