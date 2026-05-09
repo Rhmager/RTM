@@ -15,7 +15,8 @@
                     "button_style": 1,
                     "button_color": "#E1306C",
                     "embed_color": "#E1306C",
-                    "use_embed": false
+                    "use_embed": false,
+                    "show_ig_link": false
                 },
                 "reel": {
                     "title": "[🎥 Reel Baru]({url})",
@@ -25,7 +26,8 @@
                     "button_style": 1,
                     "button_color": "#E1306C",
                     "embed_color": "#E1306C",
-                    "use_embed": false
+                    "use_embed": false,
+                    "show_ig_link": false
                 },
                 "story": {
                     "title": "[⏱️ Story Baru]({url})",
@@ -35,14 +37,39 @@
                     "button_style": 4,
                     "button_color": "#ed4245",
                     "embed_color": "#f1c40f",
-                    "use_embed": false
+                    "use_embed": false,
+                    "show_ig_link": false
                 }
             },
             "toggles": {
                 "post": true,
                 "reel": true,
                 "story": true
-            }
+            },
+            "recent_posts": [
+                "3878000692204489613",
+                "3879450292798983690",
+                "3880097877087870632",
+                "3880825819334018401",
+                "3885106394169432141",
+                "3885954037263188592",
+                "3886631803830733127",
+                "3888276798228140689",
+                "3889543345907064394",
+                "3890960394684398805",
+                "3891780749022647424",
+                "3891921305608564028",
+                "3892351972232269284",
+                "3892548439422392234",
+                "3884499122619759656"
+            ],
+            "recent_stories": [
+                "3892300832138438944",
+                "3892304379110350503",
+                "3892304417110708764",
+                "3892397820074855350",
+                "3892552295829857527"
+            ]
         }
     }
 }
