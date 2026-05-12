@@ -641,17 +641,17 @@ class InstagramTracker(commands.Cog):
                             logging.info(f"IG Tracker: Notifikasi dikirim. Menemukan {new_count} {content_type_target} baru untuk @{username}.")
                         return
                     elif resp.status == 429:
-                        logging.warning(f"IG Tracker: HTTP 429 dari {url}. Delay 15 detik...")
-                        await asyncio.sleep(15)
+                        logging.warning(f"IG Tracker: HTTP 429 dari {url}. Delay {30 * (attempt + 1)} detik...")
+                        await asyncio.sleep(30 * (attempt + 1))
                     elif resp.status >= 500:
                         logging.warning(f"IG Tracker: HTTP {resp.status} dari {url}. Mencoba ulang...")
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(10)
                     else:
                         logging.error(f"IG Tracker: HTTP {resp.status} dari {url} untuk @{username}.")
                         return
             except Exception as e:
                 logging.error(f"IG Tracker: Exception pada {url} untuk @{username}: {e}")
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)
 
     @tasks.loop(minutes=20)
     async def monitor_task(self):
@@ -676,22 +676,23 @@ class InstagramTracker(commands.Cog):
                 if "recent_posts" not in data: data["recent_posts"] = []
                 if "recent_stories" not in data: data["recent_stories"] = []
 
-                track_post = data.get("toggles", {}).get("post", True)
-                track_reel = data.get("toggles", {}).get("reel", True)
-                
-                if track_post or track_reel:
+                if data.get("toggles", {}).get("post", True):
                     payload = {"username": username, "maxId": ""}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "post")
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(10)
+
+                if data.get("toggles", {}).get("reel", True):
+                    payload = {"username": username, "maxId": ""}
+                    url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
+                    await self._fetch_and_process(session, url, headers, payload, username, data, "reel")
+                    await asyncio.sleep(10)
 
                 if data.get("toggles", {}).get("story", True):
                     payload = {"username": username}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/stories"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "story")
-                    await asyncio.sleep(3)
-                
-                await asyncio.sleep(5)
+                    await asyncio.sleep(10)
 
     async def _send_notification(self, username, channels, url, direct_media_url, is_video, config_msg):
         msg_content = config_msg.get('content', '')
