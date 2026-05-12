@@ -640,6 +640,9 @@ class InstagramTracker(commands.Cog):
                         if new_count > 0:
                             logging.info(f"IG Tracker: Notifikasi dikirim. Menemukan {new_count} {content_type_target} baru untuk @{username}.")
                         return
+                    elif resp.status == 429:
+                        logging.warning(f"IG Tracker: HTTP 429 dari {url}. Delay 15 detik...")
+                        await asyncio.sleep(15)
                     elif resp.status >= 500:
                         logging.warning(f"IG Tracker: HTTP {resp.status} dari {url}. Mencoba ulang...")
                         await asyncio.sleep(5)
@@ -673,20 +676,20 @@ class InstagramTracker(commands.Cog):
                 if "recent_posts" not in data: data["recent_posts"] = []
                 if "recent_stories" not in data: data["recent_stories"] = []
 
-                if data.get("toggles", {}).get("post", True):
+                track_post = data.get("toggles", {}).get("post", True)
+                track_reel = data.get("toggles", {}).get("reel", True)
+                
+                if track_post or track_reel:
                     payload = {"username": username, "maxId": ""}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "post")
-
-                if data.get("toggles", {}).get("reel", True):
-                    payload = {"username": username, "maxId": ""}
-                    url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
-                    await self._fetch_and_process(session, url, headers, payload, username, data, "reel")
+                    await asyncio.sleep(3)
 
                 if data.get("toggles", {}).get("story", True):
                     payload = {"username": username}
                     url = "https://instagram120.p.rapidapi.com/api/instagram/stories"
                     await self._fetch_and_process(session, url, headers, payload, username, data, "story")
+                    await asyncio.sleep(3)
                 
                 await asyncio.sleep(5)
 
