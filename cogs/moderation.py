@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import time
 import aiohttp
 import sys
+from discord import app_commands
 from datetime import datetime, timedelta, timezone
 
 WIB = timezone(timedelta(hours=7))
@@ -516,6 +517,129 @@ class UniversalMembershipView(discord.ui.View):
             emoji="✅"
         ))
 
+class DynamicRoleSelect(discord.ui.Select):
+    def __init__(self, roles_data, custom_id, placeholder_text="✨ Pilih role yang ingin kamu ambil"):
+        options = []
+        for role_id_str, data in roles_data.items():
+            desc = data.get('description', None)
+            options.append(discord.SelectOption(
+                label=data['label'],
+                emoji=data.get('emoji', None),
+                value=role_id_str,
+                description=desc
+            ))
+        super().__init__(
+            placeholder=placeholder_text,
+            min_values=0,
+            max_values=len(options),
+            options=options,
+            custom_id=custom_id
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        member = interaction.user
+
+        panel_role_ids = [int(r_id) for r_id in self.view.roles_data.keys()]
+        selected_role_ids = [int(v) for v in self.values]
+
+        added_roles = []
+        removed_roles = []
+        failed_roles = []
+
+        for role_id in panel_role_ids:
+            role = guild.get_role(role_id)
+            if not role:
+                continue
+            try:
+                if role_id in selected_role_ids and role not in member.roles:
+                    await member.add_roles(role, reason="Role Panel Self-Assign")
+                    added_roles.append(role.name)
+                elif role_id not in selected_role_ids and role in member.roles:
+                    await member.remove_roles(role, reason="Role Panel Self-Remove")
+                    removed_roles.append(role.name)
+            except discord.Forbidden:
+                failed_roles.append(role.name)
+
+        if not added_roles and not removed_roles and not failed_roles:
+            result_embed = discord.Embed(
+                description="ℹ️ Tidak ada perubahan role.",
+                color=0x5865F2
+            )
+        else:
+            lines = []
+            if added_roles:
+                lines.append(f"**➕ Ditambahkan**\n" + "\n".join(f"> `{r}`" for r in added_roles))
+            if removed_roles:
+                lines.append(f"**➖ Dilepas**\n" + "\n".join(f"> `{r}`" for r in removed_roles))
+            if failed_roles:
+                lines.append(f"**❌ Gagal (izin bot)**\n" + "\n".join(f"> `{r}`" for r in failed_roles))
+
+            result_embed = discord.Embed(
+                title="✅ Pembaruan Role Berhasil",
+                description="\n\n".join(lines),
+                color=0x57F287
+            )
+        result_embed.set_footer(text=f"Diperbarui untuk {member.display_name}")
+        await interaction.followup.send(embed=result_embed, ephemeral=True)
+
+
+class DynamicRoleButton(discord.ui.Button):
+    def __init__(self, role_id_str, data):
+        super().__init__(
+            label=data['label'],
+            emoji=data.get('emoji', None),
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"rolebtn_{role_id_str}"
+        )
+        self.role_id = int(role_id_str)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        role = interaction.guild.get_role(self.role_id)
+        if not role:
+            return await interaction.followup.send(
+                embed=discord.Embed(description="❌ Role tidak ditemukan di server.", color=0xED4245),
+                ephemeral=True
+            )
+        try:
+            if role in interaction.user.roles:
+                await interaction.user.remove_roles(role, reason="Role Panel Self-Remove")
+                embed = discord.Embed(
+                    description=f"➖ Role **{role.name}** berhasil dilepas.",
+                    color=0xFEE75C
+                )
+            else:
+                await interaction.user.add_roles(role, reason="Role Panel Self-Assign")
+                embed = discord.Embed(
+                    description=f"➕ Role **{role.name}** berhasil diberikan.",
+                    color=0x57F287
+                )
+            embed.set_footer(text=f"Diperbarui untuk {interaction.user.display_name}")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send(
+                embed=discord.Embed(description=f"❌ Bot tidak memiliki izin untuk mengatur role ini.", color=0xED4245),
+                ephemeral=True
+            )
+
+
+class DynamicRoleView(discord.ui.View):
+    def __init__(self, mode, roles_data, message_id, placeholder_text="✨ Pilih role yang ingin kamu ambil"):
+        super().__init__(timeout=None)
+        self.roles_data = roles_data
+        self.message_id = message_id
+        if not roles_data:
+            empty_btn = discord.ui.Button(label="Belum ada role yang ditambahkan", disabled=True, style=discord.ButtonStyle.secondary)
+            self.add_item(empty_btn)
+            return
+        if mode == "select":
+            self.add_item(DynamicRoleSelect(roles_data, f"roleselect_{message_id}", placeholder_text))
+        elif mode == "button":
+            for role_id_str, data in roles_data.items():
+                self.add_item(DynamicRoleButton(role_id_str, data))
+
 
 class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
     def __init__(self, bot):
@@ -610,9 +734,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
                 "spam_whitelist_roles": [],
                 "goodbye_message": "Selamat tinggal, **{user}**. Sampai jumpa lagi! 👋",
                 "panel_role_stats": []
+                
             }
             save_data(self.settings_file, self.settings)
-        
+        if "role_panels" not in self.settings[guild_id_str]:
+            self.settings[guild_id_str]["role_panels"] = {}
         if "goodbye_message" not in self.settings[guild_id_str]:
             self.settings[guild_id_str]["goodbye_message"] = "Selamat tinggal, **{user}**. Sampai jumpa lagi! 👋"
         if "welcome_embed_title" not in self.settings[guild_id_str]:
@@ -803,6 +929,244 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
             
             if not self.cross_channel_spam_history[user_id]:
                 del self.cross_channel_spam_history[user_id]
+    def _build_role_panel_embeds_and_view(
+        self,
+        guild: discord.Guild,
+        panel_data: dict,
+        message_id: str
+    ) -> tuple[list[discord.Embed], DynamicRoleView]:
+        embed1 = discord.Embed()
+
+        title_text = panel_data.get("title", "Role Panel")
+        desc_text = panel_data.get("description", "")
+
+        full_desc = f"# {title_text}"
+        if desc_text:
+            full_desc += f"\n{desc_text}"
+
+        embed1.description = full_desc
+
+        if guild.icon:
+            embed1.set_thumbnail(url=guild.icon.url)
+
+        content_text = panel_data.get("content", "")
+        embeds: list[discord.Embed] = [embed1]
+
+        if content_text:
+            embed2 = discord.Embed()
+            embed2.description = content_text
+            embeds.append(embed2)
+
+        roles_data = panel_data.get("roles", {})
+        mode = panel_data.get("mode", "select")
+        placeholder = panel_data.get("placeholder", "✨ Pilih role yang ingin kamu ambil")
+        view = DynamicRoleView(mode, roles_data, message_id, placeholder)
+
+        return embeds, view
+
+    @commands.hybrid_command(name="setuppanelrole", description="Buat panel role dengan UI embed keren")
+    @commands.has_permissions(manage_guild=True)
+    @app_commands.describe(
+        channel="Channel tujuan panel",
+        mode="Pilih mode tampilan: select (dropdown) atau button",
+        judul="Judul besar panel (akan ditampilkan sebagai heading)",
+        deskripsi_judul="Teks biasa di bawah judul (opsional)",
+        konten_embed2="Teks untuk embed kedua (opsional — bisa untuk panduan/deskripsi tambahan)",
+        placeholder_select="Teks placeholder untuk dropdown select (opsional)",
+    )
+    async def setuppanelrole(
+        self,
+        ctx: commands.Context,
+        channel: discord.TextChannel,
+        mode: Literal["select", "button"],
+        judul: str,
+        deskripsi_judul: Optional[str] = None,
+        konten_embed2: Optional[str] = None,
+        placeholder_select: Optional[str] = None,
+    ):
+        guild_settings = self.get_guild_settings(ctx.guild.id)
+
+        panel_data = {
+            "channel_id":   channel.id,
+            "mode":         mode,
+            "title":        judul,
+            "description":  deskripsi_judul or "",
+            "content":      konten_embed2 or "",
+            "placeholder":  placeholder_select or "✨ Pilih role yang ingin kamu ambil",
+            "roles":        {}
+        }
+
+        embeds, view = self._build_role_panel_embeds_and_view(ctx.guild, panel_data, "PLACEHOLDER")
+        msg = await channel.send(embeds=embeds, view=view)
+
+        guild_settings.setdefault("role_panels", {})[str(msg.id)] = panel_data
+        self.save_settings()
+
+        _, real_view = self._build_role_panel_embeds_and_view(ctx.guild, panel_data, str(msg.id))
+        await msg.edit(embeds=embeds, view=real_view)
+
+        confirm_embed = self._create_embed(
+            title="✅ Panel Role Berhasil Dibuat",
+            description=(
+                f"Panel dikirim ke {channel.mention}\n"
+                f"**ID Pesan:** `{msg.id}`\n"
+                f"**Mode:** `{mode}`\n\n"
+                f"Gunakan `/addpanelrole {msg.id} @role 🎭 Label` untuk menambahkan role."
+            ),
+            color=self.color_success
+        )
+        await ctx.send(embed=confirm_embed, ephemeral=True)
+
+    @commands.hybrid_command(name="addpanelrole", description="Tambah role ke dalam Panel Role")
+    @commands.has_permissions(manage_guild=True)
+    @app_commands.describe(
+        message_id="ID pesan panel role (dari /setuppanelrole)",
+        role="Role yang akan ditambahkan",
+        emoji="Emoji untuk role ini",
+        label_teks="Label teks untuk role ini",
+        deskripsi_role="Deskripsi singkat role (muncul di bawah label pada select mode, maks 100 karakter)",
+    )
+    async def addpanelrole(
+        self,
+        ctx: commands.Context,
+        message_id: str,
+        role: discord.Role,
+        emoji: str,
+        label_teks: str,
+        deskripsi_role: Optional[str] = None,
+    ):
+        guild_settings = self.get_guild_settings(ctx.guild.id)
+        panels = guild_settings.get("role_panels", {})
+
+        if message_id not in panels:
+            return await ctx.send(
+                embed=self._create_embed(description="❌ Panel tidak ditemukan. Pastikan ID pesan benar.", color=self.color_error),
+                ephemeral=True
+            )
+
+        panel_data = panels[message_id]
+        panel_data["roles"][str(role.id)] = {
+            "emoji":       emoji,
+            "label":       label_teks,
+            "description": (deskripsi_role or "")[:100]
+        }
+        self.save_settings()
+
+        try:
+            channel = ctx.guild.get_channel(panel_data["channel_id"])
+            if not channel:
+                return await ctx.send(embed=self._create_embed(description="❌ Channel panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+
+            msg     = await channel.fetch_message(int(message_id))
+            embeds, view = self._build_role_panel_embeds_and_view(ctx.guild, panel_data, message_id)
+            await msg.edit(embeds=embeds, view=view)
+
+            await ctx.send(
+                embed=self._create_embed(
+                    description=f"✅ Role {role.mention} berhasil ditambahkan ke panel.",
+                    color=self.color_success
+                ),
+                ephemeral=True
+            )
+        except discord.NotFound:
+            await ctx.send(embed=self._create_embed(description="❌ Pesan panel tidak ditemukan (mungkin sudah dihapus).", color=self.color_error), ephemeral=True)
+        except Exception as e:
+            await ctx.send(embed=self._create_embed(description=f"❌ Gagal mengedit panel: `{e}`", color=self.color_error), ephemeral=True)
+
+    @commands.hybrid_command(name="removepanelrole", description="Hapus role dari Panel Role")
+    @commands.has_permissions(manage_guild=True)
+    @app_commands.describe(
+        message_id="ID pesan panel role",
+        role="Role yang akan dihapus dari panel",
+    )
+    async def removepanelrole(self, ctx: commands.Context, message_id: str, role: discord.Role):
+        guild_settings = self.get_guild_settings(ctx.guild.id)
+        panels = guild_settings.get("role_panels", {})
+
+        if message_id not in panels:
+            return await ctx.send(embed=self._create_embed(description="❌ Panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+
+        panel_data = panels[message_id]
+        role_id_str = str(role.id)
+
+        if role_id_str not in panel_data["roles"]:
+            return await ctx.send(embed=self._create_embed(description=f"❌ Role {role.mention} tidak ada di panel ini.", color=self.color_error), ephemeral=True)
+
+        del panel_data["roles"][role_id_str]
+        self.save_settings()
+
+        try:
+            channel = ctx.guild.get_channel(panel_data["channel_id"])
+            if not channel:
+                return await ctx.send(embed=self._create_embed(description="❌ Channel panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+
+            msg     = await channel.fetch_message(int(message_id))
+            embeds, view = self._build_role_panel_embeds_and_view(ctx.guild, panel_data, message_id)
+            await msg.edit(embeds=embeds, view=view)
+
+            await ctx.send(
+                embed=self._create_embed(description=f"✅ Role **{role.name}** berhasil dihapus dari panel.", color=self.color_success),
+                ephemeral=True
+            )
+        except discord.NotFound:
+            await ctx.send(embed=self._create_embed(description="❌ Pesan panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+        except Exception as e:
+            await ctx.send(embed=self._create_embed(description=f"❌ Gagal mengedit panel: `{e}`", color=self.color_error), ephemeral=True)
+
+    @commands.hybrid_command(name="editpanelrole", description="Edit konten teks Panel Role yang sudah ada")
+    @commands.has_permissions(manage_guild=True)
+    @app_commands.describe(
+        message_id="ID pesan panel role",
+        judul="Judul baru (kosongkan untuk tidak mengubah)",
+        deskripsi_judul="Deskripsi teks di bawah judul (kosongkan untuk tidak mengubah)",
+        konten_embed2="Teks embed kedua — kirim 'HAPUS' untuk menghapus embed kedua",
+        placeholder_select="Teks placeholder dropdown baru",
+    )
+    async def editpanelrole(
+        self,
+        ctx: commands.Context,
+        message_id: str,
+        judul: Optional[str] = None,
+        deskripsi_judul: Optional[str] = None,
+        konten_embed2: Optional[str] = None,
+        placeholder_select: Optional[str] = None,
+    ):
+        guild_settings = self.get_guild_settings(ctx.guild.id)
+        panels = guild_settings.get("role_panels", {})
+
+        if message_id not in panels:
+            return await ctx.send(embed=self._create_embed(description="❌ Panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+
+        panel_data = panels[message_id]
+
+        if judul:
+            panel_data["title"] = judul
+        if deskripsi_judul is not None:
+            panel_data["description"] = deskripsi_judul
+        if konten_embed2 is not None:
+            panel_data["content"] = "" if konten_embed2.upper() == "HAPUS" else konten_embed2
+        if placeholder_select:
+            panel_data["placeholder"] = placeholder_select
+
+        self.save_settings()
+
+        try:
+            channel = ctx.guild.get_channel(panel_data["channel_id"])
+            if not channel:
+                return await ctx.send(embed=self._create_embed(description="❌ Channel panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+
+            msg     = await channel.fetch_message(int(message_id))
+            embeds, view = self._build_role_panel_embeds_and_view(ctx.guild, panel_data, message_id)
+            await msg.edit(embeds=embeds, view=view)
+
+            await ctx.send(
+                embed=self._create_embed(description="✅ Panel berhasil diperbarui.", color=self.color_success),
+                ephemeral=True
+            )
+        except discord.NotFound:
+            await ctx.send(embed=self._create_embed(description="❌ Pesan panel tidak ditemukan.", color=self.color_error), ephemeral=True)
+        except Exception as e:
+            await ctx.send(embed=self._create_embed(description=f"❌ Gagal mengedit panel: `{e}`", color=self.color_error), ephemeral=True)
 
     @commands.command(name="setmainmembershiprole", aliases=["smr"])
     @commands.has_permissions(manage_guild=True)
@@ -1663,7 +2027,9 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ Terjadi kesalahan saat mengirim simulasi: {e}", color=self.color_error))
 
-    @commands.command(name="kick")
+    @commands.hybrid_command(name="kick", description="Keluarkan member dari server")
+    @app_commands.default_permissions(kick_members=True)
+    @app_commands.describe(member="Member yang ingin di-kick", reason="Alasan mengeluarkan member")
     @commands.has_permissions(kick_members=True)
     async def kick(self, ctx, member: discord.Member, *, reason: Optional[str] = "No reason provided."):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
@@ -1684,9 +2050,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while kicking the member: {e}", color=self.color_error))
 
-    @commands.command(name="ban")
+    @commands.hybrid_command(name="ban", description="Blokir member dari server")
+    @app_commands.default_permissions(ban_members=True)
+    @app_commands.describe(member="Member target", reason="Alasan pemblokiran")
     @commands.has_permissions(ban_members=True)
-    async def ban(self, ctx, member: discord.Member, *, reason: Optional[str] = "No reason provided."):
+    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: Optional[str] = "No reason provided."):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner: await ctx.send(embed=self._create_embed(description="❌ You cannot ban a member with an equal or higher role.", color=self.color_error)); return
         if member.top_role >= ctx.guild.me.top_role:
             await ctx.send(embed=self._create_embed(description="❌ Bot tidak dapat memblokir anggota ini karena peran mereka sama atau lebih tinggi dari peran bot.", color=self.color_error)); return
@@ -1702,9 +2070,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while banning the member: {e}", color=self.color_error))
 
-    @commands.command(name="unban")
+    @commands.hybrid_command(name="unban", description="Cabut blokir member")
+    @app_commands.default_permissions(ban_members=True)
+    @app_commands.describe(user_identifier="ID atau Username target", reason="Alasan pencabutan")
     @commands.has_permissions(ban_members=True)
-    async def unban(self, ctx, *, user_identifier: str, reason: Optional[str] = "No reason provided."):
+    async def unban(self, ctx: commands.Context, *, user_identifier: str, reason: Optional[str] = "No reason provided."):
         user_to_unban = None
         try:
             user_id = int(user_identifier)
@@ -1733,9 +2103,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while unbanning: {e}", color=self.color_error))
 
-    @commands.command(name="warn")
+    @commands.hybrid_command(name="warn", description="Beri peringatan tercatat pada member")
+    @app_commands.default_permissions(kick_members=True)
+    @app_commands.describe(member="Member target", reason="Alasan peringatan")
     @commands.has_permissions(kick_members=True)
-    async def warn(self, ctx, member: discord.Member, *, reason: str):
+    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
             await ctx.send(embed=self._create_embed(description="❌ You cannot warn a member with an equal or higher role.", color=self.color_error))
             return
@@ -1772,9 +2144,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         await ctx.send(embed=self._create_embed(description=confirm_desc, color=self.color_success))
         await self.log_action(ctx.guild, "⚠️ Member Warned", {"Member": f"{member} ({member.id})", "Moderator": ctx.author.mention, "Reason": reason}, self.color_warning)
 
-    @commands.command(name="unwarn")
+    @commands.hybrid_command(name="unwarn", description="Hapus peringatan member")
+    @app_commands.default_permissions(kick_members=True)
+    @app_commands.describe(member="Member target", warning_index="Nomor urut peringatan", reason="Alasan penghapusan")
     @commands.has_permissions(kick_members=True)
-    async def unwarn(self, ctx, member: discord.Member, warning_index: int, *, reason: Optional[str] = "Admin error."):
+    async def unwarn(self, ctx: commands.Context, member: discord.Member, warning_index: int, *, reason: Optional[str] = "Admin error."):
         guild_id_str = str(ctx.guild.id)
         member_id_str = str(member.id)
         
@@ -1843,9 +2217,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         await ctx.send(embed=embed)
         await self.log_action(ctx.guild, "💬 Pesan Selamat Tinggal Diatur", {"Moderator": ctx.author.mention, "Isi Pesan": message_content}, self.color_info)
 
-    @commands.command(name="timeout", aliases=["mute"])
+    @commands.hybrid_command(name="timeout", aliases=["mute"], description="Bungkam member sementara")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(member="Member target", duration="Durasi (misal: 10m, 1h)", reason="Alasan timeout")
     @commands.has_permissions(moderate_members=True)
-    async def timeout(self, ctx, member: discord.Member, duration: str, *, reason: Optional[str] = "No reason provided."):
+    async def timeout(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: Optional[str] = "No reason provided."):
         if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
             await ctx.send(embed=self._create_embed(description="❌ You cannot timeout a member with an equal or higher role.", color=self.color_error)); return
         if member.id == ctx.guild.owner.id:
@@ -1869,9 +2245,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while timing out: {e}", color=self.color_error))
 
-    @commands.command(name="removetimeout", aliases=["unmute"])
+    @commands.hybrid_command(name="removetimeout", aliases=["unmute"], description="Cabut status bungkam member")
+    @app_commands.default_permissions(moderate_members=True)
+    @app_commands.describe(member="Member target")
     @commands.has_permissions(moderate_members=True)
-    async def remove_timeout(self, ctx, member: discord.Member):
+    async def remove_timeout(self, ctx: commands.Context, member: discord.Member):
         if member.id == ctx.guild.owner.id: await ctx.send(embed=self._create_embed(description="❌ You cannot remove timeout for the server owner.", color=self.color_error)); return
         if member.id == self.bot.user.id: await ctx.send(embed=self._create_embed(description="❌ You cannot remove timeout for this bot itself.", color=self.color_error)); return
         if member.top_role >= ctx.guild.me.top_role:
@@ -1890,9 +2268,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while removing timeout: {e}", color=self.color_error))
         
-    @commands.command(name="clear", aliases=["purge"])
+    @commands.hybrid_command(name="clear", aliases=["purge"], description="Hapus pesan massal")
+    @app_commands.default_permissions(manage_messages=True)
+    @app_commands.describe(amount="Jumlah pesan yang akan dihapus (1-100)")
     @commands.has_permissions(manage_messages=True)
-    async def clear(self, ctx, amount: int):
+    async def clear(self, ctx: commands.Context, amount: int):
         if amount <= 0: await ctx.send(embed=self._create_embed(description="❌ Amount must be greater than 0.", color=self.color_error)); return
         if amount > 100: await ctx.send(embed=self._create_embed(description="❌ You can only delete a maximum of 100 messages at once.", color=self.color_error)); return
 
@@ -1906,9 +2286,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while deleting messages: {e}", color=self.color_error))
         
-    @commands.command(name="slowmode")
+    @commands.hybrid_command(name="slowmode", description="Atur batas waktu kirim pesan channel")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.describe(seconds="Waktu jeda dalam detik (0 untuk mematikan)")
     @commands.has_permissions(manage_channels=True)
-    async def slowmode(self, ctx, seconds: int):
+    async def slowmode(self, ctx: commands.Context, seconds: int):
         if seconds < 0: await ctx.send(embed=self._create_embed(description="❌ Slowmode duration cannot be negative.", color=self.color_error)); return
         if seconds > 21600: await ctx.send(embed=self._create_embed(description="❌ Slowmode duration cannot exceed 6 hours (21600 seconds).", color=self.color_error)); return
 
@@ -1922,9 +2304,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         except Exception as e:
             await ctx.send(embed=self._create_embed(description=f"❌ An error occurred while setting slowmode: {e}", color=self.color_error))
 
-    @commands.command(name="lock")
+    @commands.hybrid_command(name="lock", description="Kunci channel dari member biasa")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.describe(channel="Channel target (opsional)")
     @commands.has_permissions(manage_channels=True)
-    async def lock(self, ctx, channel: Optional[discord.TextChannel] = None):
+    async def lock(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
         target_channel = channel or ctx.channel
         current_perms = target_channel.permissions_for(ctx.guild.default_role)
         if not current_perms.send_messages is False:
@@ -1939,9 +2323,11 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
         else:
             await ctx.send(embed=self._create_embed(description=f"❌ Channel {target_channel.mention} is already locked.", color=self.color_error))
 
-    @commands.command(name="unlock")
+    @commands.hybrid_command(name="unlock", description="Buka kembali kunci channel")
+    @app_commands.default_permissions(manage_channels=True)
+    @app_commands.describe(channel="Channel target (opsional)")
     @commands.has_permissions(manage_channels=True)
-    async def unlock(self, ctx, channel: Optional[discord.TextChannel] = None):
+    async def unlock(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
         target_channel = channel or ctx.channel
         current_perms = target_channel.permissions_for(ctx.guild.default_role)
         if not current_perms.send_messages is True:
@@ -2596,41 +2982,6 @@ class ServerAdminCog(commands.Cog, name="👑 Administrasi"):
                 guild_settings['mod_panel_channel_id'] = channel.id
                 self.save_settings()
 
-    @commands.command(name="addpanelrole", aliases=["apr"])
-    @commands.has_permissions(manage_guild=True)
-    async def add_panel_role(self, ctx: commands.Context, role: discord.Role):
-        guild_settings = self.get_guild_settings(ctx.guild.id)
-        role_list = guild_settings.get("panel_role_stats", [])
-
-        if len(role_list) >= 5:
-            return await ctx.send(embed=self._create_embed(description="❌ Batas maksimum 5 Role untuk statistik panel sudah tercapai.", color=self.color_error))
-        
-        if role.id in role_list:
-            return await ctx.send(embed=self._create_embed(description=f"❌ Role {role.mention} sudah ada di daftar statistik panel.", color=self.color_error))
-        
-        role_list.append(role.id)
-        guild_settings["panel_role_stats"] = role_list
-        self.save_settings()
-        
-        await ctx.send(embed=self._create_embed(description=f"✅ Role **{role.name}** berhasil ditambahkan ke statistik Mod Panel. (Total: {len(role_list)}/5)", color=self.color_success))
-        await self.log_action(ctx.guild, "📊 Panel Role Ditambahkan", {"Role": role.mention, "Moderator": ctx.author.mention}, self.color_info)
-
-    @commands.command(name="removepanelrole", aliases=["rpr"])
-    @commands.has_permissions(manage_guild=True)
-    async def remove_panel_role(self, ctx: commands.Context, role: discord.Role):
-        guild_settings = self.get_guild_settings(ctx.guild.id)
-        role_list = guild_settings.get("panel_role_stats", [])
-
-        if role.id not in role_list:
-            return await ctx.send(embed=self._create_embed(description=f"❌ Role {role.mention} tidak ditemukan di daftar statistik panel.", color=self.color_error))
-        
-        role_list.remove(role.id)
-        guild_settings["panel_role_stats"] = role_list
-        self.save_settings()
-        
-        await ctx.send(embed=self._create_embed(description=f"✅ Role **{role.name}** berhasil dihapus dari statistik Mod Panel. (Total: {len(role_list)}/5)", color=self.color_success))
-        await self.log_action(ctx.guild, "📊 Panel Role Dihapus", {"Role": role.mention, "Moderator": ctx.author.mention}, self.color_info)
- 
     @commands.command(name="modpanel")
     @commands.has_permissions(manage_guild=True)
     async def modpanel(self, ctx: commands.Context):

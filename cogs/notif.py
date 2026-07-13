@@ -24,7 +24,7 @@ API_KEYS = []
 if os.getenv("GOOGLE_API_KEY"):
     API_KEYS.append(os.getenv("GOOGLE_API_KEY"))
 
-key_index = 2
+key_index = 1
 while True:
     extra_key = os.getenv(f"GOOGLE_API_KEY_{key_index}")
     if extra_key:
@@ -214,44 +214,19 @@ class ButtonColorView(discord.ui.View):
         
         for label, style, hex_color in preset_colors:
             button = discord.ui.Button(label=label, style=style, row=1)
-            
-            async def callback(interaction: discord.Interaction, btn_style_value, btn_hex):
-                config_msg = self.parent_view.cog.config["notification_paths"][self.path_id]["custom_messages"][self.type_key]
-                config_msg["button_style"] = btn_style_value
-                config_msg["button_color"] = btn_hex
-                self.parent_view.cog.save_config()
-                await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
-                self.stop()
-            
-            button.callback = partial(callback, btn_style_value=style.value, btn_hex=hex_color)
+            button.callback = partial(self._on_button_color_selected, btn_style_value=style.value, btn_hex=hex_color)
             self.add_item(button)
         
         self.add_item(discord.ui.Button(label="WARNA EMBED", style=discord.ButtonStyle.grey, disabled=True, row=2))
         
         for label, hex_color in embed_colors[:4]:
             button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=3)
-            
-            async def callback(interaction: discord.Interaction, embed_hex):
-                config_msg = self.parent_view.cog.config["notification_paths"][self.path_id]["custom_messages"][self.type_key]
-                config_msg["embed_color"] = embed_hex
-                self.parent_view.cog.save_config()
-                await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
-                self.stop()
-            
-            button.callback = partial(callback, embed_hex=hex_color)
+            button.callback = partial(self._on_embed_color_selected, embed_hex=hex_color)
             self.add_item(button)
         
         for label, hex_color in embed_colors[4:]:
             button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary, row=4)
-            
-            async def callback(interaction: discord.Interaction, embed_hex=hex_color):
-                config_msg = self.parent_view.cog.config["notification_paths"][self.path_id]["custom_messages"][self.type_key]
-                config_msg["embed_color"] = embed_hex
-                self.parent_view.cog.save_config()
-                await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
-                self.stop()
-            
-            button.callback = partial(callback, embed_hex=hex_color)
+            button.callback = partial(self._on_embed_color_selected, embed_hex=hex_color)
             self.add_item(button)
         
         custom_embed_btn = discord.ui.Button(label="Custom Warna Embed", style=discord.ButtonStyle.secondary, row=0)
@@ -259,6 +234,12 @@ class ButtonColorView(discord.ui.View):
             await interaction.response.send_modal(ColorInputModal(self.parent_view, self.type_key, self.path_id, 'embed'))
         custom_embed_btn.callback = custom_embed_callback
         self.add_item(custom_embed_btn)
+
+        custom_button_btn = discord.ui.Button(label="Custom Warna Tombol", style=discord.ButtonStyle.secondary, row=0)
+        async def custom_button_callback(interaction: discord.Interaction):
+            await interaction.response.send_modal(ColorInputModal(self.parent_view, self.type_key, self.path_id, 'button'))
+        custom_button_btn.callback = custom_button_callback
+        self.add_item(custom_button_btn)
             
         cancel_button = discord.ui.Button(label="Batalkan", style=discord.ButtonStyle.red, row=4)
         async def cancel_callback(interaction: discord.Interaction):
@@ -266,6 +247,21 @@ class ButtonColorView(discord.ui.View):
             self.stop()
         cancel_button.callback = cancel_callback
         self.add_item(cancel_button)
+
+    async def _on_button_color_selected(self, interaction: discord.Interaction, btn_style_value, btn_hex):
+        config_msg = self.parent_view.cog.config["notification_paths"][self.path_id]["custom_messages"][self.type_key]
+        config_msg["button_style"] = btn_style_value
+        config_msg["button_color"] = btn_hex
+        self.parent_view.cog.save_config()
+        await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
+        self.stop()
+
+    async def _on_embed_color_selected(self, interaction: discord.Interaction, embed_hex):
+        config_msg = self.parent_view.cog.config["notification_paths"][self.path_id]["custom_messages"][self.type_key]
+        config_msg["embed_color"] = embed_hex
+        self.parent_view.cog.save_config()
+        await interaction.response.edit_message(embed=self.parent_view.build_embed(), view=self.parent_view)
+        self.stop()
 
 class MessageConfigView(discord.ui.View):
     def __init__(self, cog, type_key, path_id):
@@ -372,10 +368,16 @@ class MessageConfigView(discord.ui.View):
         self.cog.save_config()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
         
+    @discord.ui.button(label="← Pilih Tipe Lain", style=discord.ButtonStyle.secondary, row=3)
+    async def back_to_type_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        type_select_view = TypeSelectView(self.cog, interaction.guild.id, self.path_id)
+        await interaction.response.edit_message(content=f"Jalur dipilih: `{self.path_id}`. Pilih Tipe Pesan:", embed=None, view=type_select_view)
+        self.stop()
+
     @discord.ui.button(label="Selesai", style=discord.ButtonStyle.green, row=3)
     async def finish_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.delete()
-        await interaction.response.send_message("Pengaturan pesan berhasil disimpan!", ephemeral=True, delete_after=5)
+        type_select_view = TypeSelectView(self.cog, interaction.guild.id, self.path_id)
+        await interaction.response.edit_message(content=f"Pengaturan `{self.type_key}` tersimpan. Jalur: `{self.path_id}`. Pilih Tipe Pesan lain atau tutup pesan ini:", embed=None, view=type_select_view)
         self.stop()
 
 class PathSelectView(discord.ui.View):
@@ -446,7 +448,7 @@ class TypeSelectView(discord.ui.View):
         async def callback(interaction: discord.Interaction):
             selected_type_key = type_select.values[0]
             message_config_view = MessageConfigView(self.cog, selected_type_key, self.path_id)
-            await interaction.response.edit_message(embed=message_config_view.build_embed(), view=message_config_view)
+            await interaction.response.edit_message(content=None, embed=message_config_view.build_embed(), view=message_config_view)
             self.stop()
         
         type_select.callback = callback
@@ -532,6 +534,10 @@ class Notif(commands.Cog, name="🔔 Notification"):
                                     url = final_url
                     except Exception:
                         pass
+
+                    resolved_live_match = re.search(r'tiktok\.com/@([\w.-]+)/live', url, re.IGNORECASE)
+                    if resolved_live_match:
+                        return "tiktok_live", url
                 
                 if "www.tiktok.com" not in url and "tiktok.com" in url:
                     url = url.replace("tiktok.com", "www.tiktok.com")
@@ -739,7 +745,7 @@ class Notif(commands.Cog, name="🔔 Notification"):
         
         self.save_config()
 
-    @tasks.loop(hours=1)
+    @tasks.loop(hours=24)
     async def daily_reset_task(self):
         await self._perform_daily_reset()
 
@@ -936,16 +942,11 @@ class Notif(commands.Cog, name="🔔 Notification"):
 
         ai_hype_text = await self._generate_jarkasih_hype(link_type)
 
-        needs_yt_dlp = False
-        for path_data in paths_to_send:
-            config_msg = path_data["custom_messages"].get(link_type, self.default_messages.get(link_type))
-            if config_msg and config_msg.get('use_embed', False):
-                needs_yt_dlp = True
-                break
+        needs_yt_dlp = link_type in ["live", "upload", "premier"]
 
         youtube_title, youtube_description, youtube_thumbnail, video_url = None, None, None, link_for_send
         
-        if needs_yt_dlp and link_type in ["live", "upload", "premier"]: 
+        if needs_yt_dlp: 
             loop = self.bot.loop
             cookie_path = None
             temp_file_name = None 
@@ -1006,15 +1007,13 @@ class Notif(commands.Cog, name="🔔 Notification"):
                     
                     if final_content:
                         final_content = final_content.replace("{judul}", clean_title)
-                        if video_url and self._is_valid_url(video_url):
-                            final_content = final_content.replace("{url}", video_url)
+                        final_content = final_content.replace("{url}", video_url if self._is_valid_url(video_url) else "")
                     
                     if final_embed_title:
                         final_embed_title = final_embed_title.replace("{judul}", clean_title)
-                        if video_url and self._is_valid_url(video_url):
-                            final_embed_title = final_embed_title.replace("{url}", video_url)
-                    elif not final_embed_title and use_embed:
-                        if video_url and self._is_valid_url(video_url):
+                        final_embed_title = final_embed_title.replace("{url}", video_url if self._is_valid_url(video_url) else "")
+                    elif use_embed:
+                        if self._is_valid_url(video_url):
                             final_embed_title = f"[{clean_title}]({video_url})"
                         else:
                             final_embed_title = clean_title
@@ -1026,16 +1025,12 @@ class Notif(commands.Cog, name="🔔 Notification"):
                         else:
                             final_embed_description = final_embed_description.replace("{deskripsi}", "")
                             
-                        if video_url and self._is_valid_url(video_url):
-                            final_embed_description = final_embed_description.replace("{url}", video_url)
-                    elif not final_embed_description and use_embed:
+                        final_embed_description = final_embed_description.replace("{url}", video_url if self._is_valid_url(video_url) else "")
+                    elif use_embed:
                         if youtube_description:
                             final_embed_description = youtube_description[:1900] + ('...' if len(youtube_description) > 1900 else '')
                         else:
                             final_embed_description = ""
-                        
-                        if video_url and self._is_valid_url(video_url):
-                            final_embed_description = final_embed_description.replace("{url}", video_url)
 
                 
                 elif link_type in ["tiktok", "tiktok_live", "instagram", "instagram_live"]:
@@ -1089,7 +1084,7 @@ class Notif(commands.Cog, name="🔔 Notification"):
                               embed.set_image(url=youtube_thumbnail)
                          
                          if message_content is None: 
-                             message_content = " "
+                             message_content = None
                     else:
                          message_content = final_content if final_content else link_for_send
                          if not final_content:
